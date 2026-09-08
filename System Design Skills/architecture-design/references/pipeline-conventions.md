@@ -22,25 +22,31 @@ create or confirm a project ID in the first place) and `list-projects`.
 
 ## Getting the project ID: do this before anything else, every time
 
-A project ID is a two-word adjective-food string (e.g. `curious-mango`),
-minted by `pipeline_tool.py` — never invented or guessed by a skill or by
-you. Before running any other `pipeline_tool.py` command, in every skill
-in this pipeline (including the orchestrator), work out the project ID
-like this:
+A project's unique ID is a two-word string (e.g. `curious-mango`), minted
+by `pipeline_tool.py` — never invented or guessed by a skill or by you.
+Before running any other `pipeline_tool.py` command, in every skill in
+this pipeline (including the orchestrator), work out the project ID like
+this:
 
 1. **Check whether the user already gave you one** in their current
    message or earlier in this conversation (it looks like
    `word-word`). If so, skip to step 3.
 2. **Otherwise, ask.** Something like: *"Is this a new project, or do you
-   have an existing project ID (looks like `curious-mango`)?"*
-   - **New project:** run `python scripts/pipeline_tool.py resolve-project`
-     with no `--project`. It mints an ID and creates its directory. Tell
-     the user the new ID and that they'll need it to resume this project
-     later (they might want to save it somewhere).
+   have an existing project ID (looks like `curious-mango`)? If it's new,
+   what should I call it — a short name like 'url-shortener' is fine."*
+   - **New project:** run
+     `python scripts/pipeline_tool.py resolve-project --name "<short name>"`
+     with no `--project` (omit `--name` if the user didn't give one). It
+     mints an ID, creates the project's folder (see "Where documents live"
+     below), and registers it. Tell the user the new ID and that they'll
+     need it to resume this project later (they might want to save it
+     somewhere) — the folder path alone won't help them resume, since
+     resuming works through the ID, not by remembering a path.
    - **Existing project — user gives you an ID:** go to step 3.
    - **User doesn't remember their ID:** run
      `python scripts/pipeline_tool.py list-projects` and show them the
-     list to jog their memory, rather than guessing which one they mean.
+     list (name + ID + path) to jog their memory, rather than guessing
+     which one they mean.
 3. **Confirm an existing ID before trusting it:**
    `python scripts/pipeline_tool.py resolve-project --project <id>`.
    - `EXISTING` → use it for the rest of this session.
@@ -90,38 +96,62 @@ human readability), not a single markdown file. `pipeline_tool.py` hashes
 directories automatically (`hash_path` / `hash-file` both handle this) —
 you don't need to do anything different when calling `finalize`.
 
-## Directory layout
+## Where documents live
 
-Everything lives under `design-docs/<project-id>/`, so a workspace can
-hold many unrelated projects side by side without their versions or
-LATEST pointers colliding:
+Documents are **not** written relative to wherever Claude Code happens to
+be running, and **not** inside the skills installation directory. Each
+project gets its own folder directly under a fixed OS-level location:
+
+| OS | Location |
+|---|---|
+| macOS / Linux | `$HOME/<slug>-<unique-id>/` |
+| Windows | `C:\<slug>-<unique-id>\` |
+
+`<slug>` comes from the short project name you asked the user for (e.g.
+"URL Shortener" → `url-shortener`); `<unique-id>` is the minted ID (e.g.
+`curious-mango`). If the user didn't give a name, the slug falls back to
+`project`. So a typical project folder looks like
+`/home/alex/url-shortener-curious-mango/` or
+`C:\url-shortener-curious-mango\`.
+
+`pipeline_tool.py` resolves the exact path for you — you never construct
+it by hand. `resolve-project` returns it as `path` in its JSON output; the
+same value comes back from every other command's output wherever a path
+is reported (`latest`, `next-version`, `check-ready`). When writing a new
+document, build its path from that project root: `<project-root>/<doc-type>/vX.Y.md`.
+
+**This location can be overridden** by setting the `DESIGN_PIPELINE_HOME`
+environment variable before running `pipeline_tool.py` — useful mainly if
+the default location (home directory, or `C:\` on Windows) isn't writable
+in a given environment. This isn't something to suggest unprompted; only
+mention it if a command actually fails with a permissions error writing to
+the default location.
+
+Inside a project's folder, the layout is:
 
 ```
-design-docs/
-  curious-mango/
-    product-idea/
-      current.md
-      LATEST.json            # {"version", "hash", "doc_path"}
-    functional-requirements/
-      v1.0.md
-      v1.0.data.json
-      v1.0.envelope.json
-      LATEST.json            # {"version","status","doc_path","data_path","envelope_path","hash"}
-    non-functional-requirements/   (same shape)
-    architecture-design/           (same shape)
-    mermaid-diagrams/
-      v1.0/                  # directory: 01-request-flow.mmd, index.md, ...
-      v1.0.data.json
-      v1.0.envelope.json
-      LATEST.json            # doc_path points at the v1.0/ directory
-  another-project-id/
-    ...
+<project-root>/                          e.g. C:\url-shortener-curious-mango\
+  product-idea/
+    current.md
+    LATEST.json            # {"version", "hash", "doc_path"}
+  functional-requirements/
+    v1.0.md
+    v1.0.data.json
+    v1.0.envelope.json
+    LATEST.json            # {"version","status","doc_path","data_path","envelope_path","hash"}
+  non-functional-requirements/   (same shape)
+  architecture-design/           (same shape)
+  mermaid-diagrams/
+    v1.0/                  # directory: 01-request-flow.mmd, index.md, ...
+    v1.0.data.json
+    v1.0.envelope.json
+    LATEST.json            # doc_path points at the v1.0/ directory
 ```
 
-`pipeline_tool.py` resolves all of this for you once you pass
-`--project curious-mango` — you never need to construct these paths by
-hand except when writing a new document's `.md`/`.data.json` (see each
-skill's own "Finishing" section for the exact path).
+Separately, a small registry at `<home-or-C:\>/.design-pipeline/projects.json`
+maps every project's unique ID to its folder and name — this is what
+`resolve-project` and `list-projects` read and write. You don't need to
+touch this file directly; it's internal bookkeeping, not a document.
 
 Documents are never edited in place. A new version is a new set of files;
 `LATEST.json` is the only thing that gets overwritten, and only via
@@ -150,8 +180,8 @@ that makes a new version visible to downstream skills or the orchestrator
   "document_type": "functional-requirements",
   "status": "READY",
   "version": "1.1",
-  "document_path": "design-docs/curious-mango/functional-requirements/v1.1.md",
-  "data_path": "design-docs/curious-mango/functional-requirements/v1.1.data.json",
+  "document_path": "<project-root>/functional-requirements/v1.1.md",
+  "data_path": "<project-root>/functional-requirements/v1.1.data.json",
   "inputs_consumed": {
     "product-idea": {"version": "1.1", "hash": "sha256:..."}
   },

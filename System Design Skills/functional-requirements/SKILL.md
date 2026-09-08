@@ -15,9 +15,10 @@ shares.
 ## Step 1: Get the project ID
 
 Before anything else, work out which project this is —
-`references/pipeline-conventions.md` has the exact procedure (check
-conversation for an existing ID, otherwise ask the user whether it's new
-or existing, then mint or confirm via `resolve-project`). Every
+`references/pipeline-conventions.md` has the exact procedure. Since this is
+usually the first stage invoked for a brand-new product, you're often the
+one asking "new or existing, and if new, what should I call it?" and
+minting the ID via `resolve-project --name "<short name>"`. Every
 `pipeline_tool.py` call below assumes you've done this and shows
 `--project <id>` accordingly — always place it **before** the subcommand.
 
@@ -26,6 +27,12 @@ itself informative: it means you're likely resuming, not starting fresh —
 run `plan` (see Finishing) or just proceed with the idea they give you,
 which `next-version` will treat as a revision automatically.
 
+Documents for this project live in a dedicated folder outside your working
+directory (the user's home directory, or `C:\` on Windows — see
+`references/pipeline-conventions.md`), not wherever this session happens
+to be running. `resolve-project`'s output includes the exact `path` — hang
+onto it for constructing file paths in Finishing.
+
 ## Input
 
 The only input is the product idea. There is no upstream document to
@@ -33,7 +40,7 @@ validate — this is the one skill in the pipeline with no `check-ready` gate.
 
 - If the user gave you the idea directly in conversation, record it:
   `echo "<idea text>" | python scripts/pipeline_tool.py --project <id> set-idea`
-- If `design-docs/<id>/product-idea/LATEST.json` already exists and the
+- If a product idea has already been recorded for this project and the
   user hasn't given you new idea text, use the existing one — read it with
   `python scripts/pipeline_tool.py --project <id> latest product-idea` and
   load the file at `doc_path`.
@@ -154,19 +161,20 @@ Once the user has confirmed the draft (or told you to proceed without
 further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version functional-requirements`
-2. Write `design-docs/<id>/functional-requirements/v<version>.md` (from the
-   template) and `design-docs/<id>/functional-requirements/v<version>.data.json`
-   (per the schema).
+2. Write `<project-root>/functional-requirements/v<version>.md` (from the
+   template) and `<project-root>/functional-requirements/v<version>.data.json`
+   (per the schema) — `<project-root>` is the `path` from Step 1's
+   `resolve-project` output.
 3. Hash the product idea input: `python scripts/pipeline_tool.py --project <id> latest product-idea`
    (use its `hash` and `version` in your envelope's `inputs_consumed`).
 4. Validate your own data file before finalizing:
-   `python scripts/pipeline_tool.py --project <id> validate-data functional-requirements --path design-docs/<id>/functional-requirements/v<version>.data.json`
+   `python scripts/pipeline_tool.py --project <id> validate-data functional-requirements --path <project-root>/functional-requirements/v<version>.data.json`
    — fix any reported errors before proceeding.
-5. Write the envelope to `design-docs/<id>/functional-requirements/v<version>.envelope.json`
+5. Write the envelope to `<project-root>/functional-requirements/v<version>.envelope.json`
    per `references/pipeline-conventions.md`'s schema, mapping your
    Completeness Assessment status to the envelope `status` per that doc's
    mapping table, with `"next_skill": "non-functional-requirements"`.
-6. Run `python scripts/pipeline_tool.py --project <id> finalize design-docs/<id>/functional-requirements/v<version>.envelope.json`
+6. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/functional-requirements/v<version>.envelope.json`
 7. Report to the user: the project ID (if this was newly minted, remind
    them to save it), the version produced, a short summary, and — if
    status is READY — that `non-functional-requirements` can now run. If

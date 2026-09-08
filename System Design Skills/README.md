@@ -85,9 +85,11 @@ going at once without them colliding, and what lets you *resume* a project
 later rather than starting over.
 
 - **New project:** don't have an ID? Just start talking — the first skill
-  you invoke (usually the orchestrator) will ask "new or existing?" and
-  mint one for you (`resolve-project`). **Save this ID** — it's the only
-  way to resume the project later.
+  you invoke (usually the orchestrator) will ask "new or existing, and if
+  new, what should I call it?" A short name (e.g. "url-shortener") becomes
+  part of the folder name; the unique ID it mints alongside that is what
+  you'll actually use to resume. **Save the ID** — the name alone won't be
+  enough to resume, since it's not guaranteed unique on its own.
 - **Existing project:** give it your ID. The skill confirms it exists,
   then checks what — if anything — actually needs to be regenerated.
 
@@ -97,16 +99,32 @@ input (the product idea, an FR, an NFR constraint) and re-running only
 regenerates what actually changed, cascading downstream automatically —
 you don't need to remember to re-run everything by hand.
 
-All of this lives on disk under:
+All of this lives on disk in a dedicated project folder — **not** inside
+this skill's installation directory, and **not** relative to wherever
+Claude Code happens to be running:
+
+| OS | Location |
+|---|---|
+| macOS / Linux | `$HOME/<project-name>-<unique-id>/` |
+| Windows | `C:\<project-name>-<unique-id>\` |
+
+e.g. `/home/alex/url-shortener-curious-mango/` or
+`C:\url-shortener-curious-mango\`. Inside that folder:
 
 ```
-design-docs/<project-id>/
+<project-root>/
   product-idea/
   functional-requirements/
   non-functional-requirements/
   architecture-design/
   mermaid-diagrams/
 ```
+
+A small registry at `<home-or-C:\>/.design-pipeline/projects.json` maps
+each project's unique ID to this folder, which is how `list-projects` and
+resuming by ID work without scanning your whole home directory. If the
+default location isn't writable in your environment, set the
+`DESIGN_PIPELINE_HOME` environment variable to redirect it.
 
 ---
 

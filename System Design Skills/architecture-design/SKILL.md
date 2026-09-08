@@ -22,7 +22,10 @@ or existing, then confirm via `resolve-project`). This skill is never the
 first stage run for a brand-new project, so you should normally be
 *confirming* an ID the user already has. Every `pipeline_tool.py` call
 below assumes a confirmed `--project <id>`, placed **before** the
-subcommand.
+subcommand, and its `path` (documents live in a dedicated folder under
+the user's home directory, or `C:\` on Windows — see
+`references/pipeline-conventions.md` — not wherever this session happens
+to be running).
 
 ## Input gate
 
@@ -203,19 +206,20 @@ Once the user has confirmed the draft (or told you to proceed without
 further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version architecture-design`
-2. Write `design-docs/<id>/architecture-design/v<version>.md` and
-   `design-docs/<id>/architecture-design/v<version>.data.json`.
+2. Write `<project-root>/architecture-design/v<version>.md` and
+   `<project-root>/architecture-design/v<version>.data.json`
+   (`<project-root>` is the `path` from Step 1's `resolve-project` output).
 3. Record `inputs_consumed` for both `functional-requirements` and
    `non-functional-requirements` (version + hash from the `check-ready`
    output above).
 4. Validate your own data file:
-   `python scripts/pipeline_tool.py --project <id> validate-data architecture-design --path design-docs/<id>/architecture-design/v<version>.data.json`
-5. Write the envelope to `design-docs/<id>/architecture-design/v<version>.envelope.json`,
+   `python scripts/pipeline_tool.py --project <id> validate-data architecture-design --path <project-root>/architecture-design/v<version>.data.json`
+5. Write the envelope to `<project-root>/architecture-design/v<version>.envelope.json`,
    mapping your Completeness Assessment status per
    `references/pipeline-conventions.md`'s table, with
    `"next_skill": "mermaid-diagrams"` (set this even on `CONFLICT` status,
    since re-running after the conflict is resolved still leads there).
-6. Run `python scripts/pipeline_tool.py --project <id> finalize design-docs/<id>/architecture-design/v<version>.envelope.json`
+6. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/architecture-design/v<version>.envelope.json`
 7. Report to the user the version produced, a short summary, whether any
    conflicts were found, and whether `mermaid-js` can now run — report
    this even if the orchestrator invoked you, rather than silently

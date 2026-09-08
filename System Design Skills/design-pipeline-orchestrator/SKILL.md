@@ -27,13 +27,16 @@ in — that's the whole point of asking:
    message (looks like `word-word`, e.g. `curious-mango`). If so, skip to
    step 3.
 2. **Otherwise, ask:** *"Is this a new project, or do you have an existing
-   project ID?"*
-   - **New:** `python scripts/pipeline_tool.py resolve-project` (no
-     `--project`). This mints an ID and creates its folder — tell the user
-     the new ID and that they should hang onto it to resume later.
+   project ID? If it's new, what should I call it — a short name is
+   fine."*
+   - **New:** `python scripts/pipeline_tool.py resolve-project --name "<short name>"`
+     (no `--project`; omit `--name` if the user didn't give one). This
+     mints an ID, creates its folder, and registers it — tell the user the
+     new ID and that they should hang onto it to resume later (the name
+     alone won't be enough to resume; resuming works through the ID).
    - **Existing, but they don't remember the exact ID:** run
      `python scripts/pipeline_tool.py list-projects` and show them the
-     list rather than guessing.
+     list (with names) rather than guessing.
 3. **If they gave you an ID, confirm it before trusting it:**
    `python scripts/pipeline_tool.py resolve-project --project <id>`.
    - `EXISTING` → this is a returning project; proceed to Step 2 below,
@@ -42,6 +45,12 @@ in — that's the whole point of asking:
    - `PROJECT_NOT_FOUND` → tell the user plainly, and ask whether they
      mistyped it or actually want to start fresh. Don't silently mint a
      new ID as a fallback.
+
+Documents for this project are written to a dedicated folder outside
+whatever directory this session happens to be running in — the user's
+home directory, or `C:\` on Windows (see
+`references/pipeline-conventions.md`). `resolve-project`'s output
+includes the exact `path`; you don't need to do anything with it yourself; each stage skill derives its own file paths from it.
 
 Every `pipeline_tool.py` call for the rest of this run uses
 `--project <id>` (placed **before** the subcommand — see

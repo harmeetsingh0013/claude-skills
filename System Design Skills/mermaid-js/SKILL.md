@@ -23,7 +23,10 @@ or existing, then confirm via `resolve-project`). This skill is never the
 first stage run for a brand-new project, so you should normally be
 *confirming* an ID the user already has. Every `pipeline_tool.py` call
 below assumes a confirmed `--project <id>`, placed **before** the
-subcommand.
+subcommand, and its `path` (documents live in a dedicated folder under
+the user's home directory, or `C:\` on Windows — see
+`references/pipeline-conventions.md` — not wherever this session happens
+to be running).
 
 ## Input gate
 
@@ -86,11 +89,13 @@ specification didn't ask for.
 Each version is a **directory**, not a single file:
 
 ```
-design-docs/<id>/mermaid-diagrams/v<version>/
+<project-root>/mermaid-diagrams/v<version>/
   01-<kebab-case-name>.mmd
   02-<kebab-case-name>.mmd
   index.md
 ```
+
+`<project-root>` is the `path` from Step 1's `resolve-project` output.
 
 Number files in the order the architecture document's diagram
 specification lists them. `index.md` follows `templates/mermaid-diagrams.md`
@@ -134,18 +139,18 @@ Once the user has confirmed the draft (or told you to proceed without
 further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version mermaid-diagrams`
-2. Write `design-docs/<id>/mermaid-diagrams/v<version>/` (the `.mmd` files +
-   `index.md`) and `design-docs/<id>/mermaid-diagrams/v<version>.data.json`.
+2. Write `<project-root>/mermaid-diagrams/v<version>/` (the `.mmd` files +
+   `index.md`) and `<project-root>/mermaid-diagrams/v<version>.data.json`.
 3. Record `inputs_consumed` for `architecture-design` (version + hash from
    the `check-ready` output above).
 4. Validate your own data file:
-   `python scripts/pipeline_tool.py --project <id> validate-data mermaid-diagrams --path design-docs/<id>/mermaid-diagrams/v<version>.data.json`
-5. Write the envelope to `design-docs/<id>/mermaid-diagrams/v<version>.envelope.json`,
+   `python scripts/pipeline_tool.py --project <id> validate-data mermaid-diagrams --path <project-root>/mermaid-diagrams/v<version>.data.json`
+5. Write the envelope to `<project-root>/mermaid-diagrams/v<version>.envelope.json`,
    with `"document_path"` set to the **directory** (not a file inside it),
    `status` set to `READY` or `BLOCKED_QUESTION` per
    `references/pipeline-conventions.md`'s mapping table, and
    `"next_skill": null` — this is the last stage.
-6. Run `python scripts/pipeline_tool.py --project <id> finalize design-docs/<id>/mermaid-diagrams/v<version>.envelope.json`
+6. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/mermaid-diagrams/v<version>.envelope.json`
    (it hashes the whole directory automatically).
 7. Report to the user the version produced, which diagrams were generated,
    and which method (MCP vs native) and validation level each used.

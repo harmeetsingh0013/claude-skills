@@ -3,42 +3,50 @@
 pipeline_tool.py — deterministic bookkeeping for the design pipeline.
 
 This script owns everything that must be exact and repeatable: project
-identity, hashing, version arithmetic, reading/writing LATEST.json
-pointers, validating structured data documents against their JSON Schema
-contracts, and deciding whether a document is stale relative to its
-inputs. Claude is responsible for everything that requires judgment
-(writing the documents themselves, detecting semantic conflicts, deciding
-wording, and asking the user for a project ID) — this script never
-generates or edits document content and never asks the user anything
-itself.
+identity and storage location, hashing, version arithmetic, reading/
+writing LATEST.json pointers, validating structured data documents
+against their JSON Schema contracts, and deciding whether a document is
+stale relative to its inputs. Claude is responsible for everything that
+requires judgment (writing the documents themselves, detecting semantic
+conflicts, deciding wording, and asking the user for a project name/ID) —
+this script never generates or edits document content and never asks the
+user anything itself.
 
-All paths are relative to the current working directory, which must be
-the root of the project workspace (the directory that contains, or will
-contain, design-docs/).
+=== Where projects live ===
 
-=== Projects ===
+Each project gets its own folder, named "<slugified-name>-<unique-id>"
+(e.g. "url-shortener-curious-mango"), directly under:
 
-Every pipeline run belongs to a project, identified by a two-word
-adjective-food ID (e.g. "curious-mango"), which namespaces its own
-subtree under design-docs/:
+  - macOS/Linux: the user's home directory ($HOME)
+  - Windows: the root of the C:\\ drive
 
-    design-docs/
-      curious-mango/
-        product-idea/...
-        functional-requirements/...
-        non-functional-requirements/...
-        architecture-design/...
-        mermaid-diagrams/...
-      another-project-id/
-        ...
+This is deliberately NOT a subfolder relative to wherever Claude Code
+happens to be running (unlike a plain "design-docs/" folder would be), and
+NOT inside the skills installation directory. Every stage's output for a
+project lives directly under that one project folder:
 
-A project ID is never guessed or invented by a skill. Every command
-except `resolve-project` and `list-projects` requires `--project <id>`,
-and refuses to run if that project doesn't already exist — the calling
-skill is responsible for asking the user for the ID first (or minting a
-new one via `resolve-project` with no --project, for a brand-new project)
-before making any other call. See references/pipeline-conventions.md for
-the exact interaction pattern every skill follows.
+    <home-or-C:\\>/url-shortener-curious-mango/
+      product-idea/
+      functional-requirements/
+      non-functional-requirements/
+      architecture-design/
+      mermaid-diagrams/
+
+Override the base location by setting the DESIGN_PIPELINE_HOME environment
+variable (e.g. if writing to C:\\'s root fails due to permissions) — this
+isn't something a skill should suggest unprompted, but it's there if the
+default location doesn't work in a given environment.
+
+Since a project's full folder name includes a human-readable slug that a
+skill doesn't know in advance, project identity is tracked through a small
+registry file at <base>/.design-pipeline/projects.json, mapping each
+project's unique ID (the part a user actually types, e.g. "curious-mango")
+to its folder name and full path. A project ID is never guessed or
+invented by a skill — every command except `resolve-project` and
+`list-projects` requires `--project <id>`, and refuses to run if that ID
+isn't in the registry. See references/pipeline-conventions.md for the
+exact interaction pattern every skill follows, including asking the user
+for a short project name when starting a brand-new project.
 
 === The contract: every document is TWO files, not one ===
 
@@ -56,9 +64,9 @@ pipeline treat a version as usable input. mermaid-diagrams is the one
 exception where "document_path" is a directory of .mmd files rather than a
 single .md — see hash_path().
 
-Directory layout this script maintains (within one project's subtree):
+Directory layout this script maintains (within one project's folder):
 
-    design-docs/<project-id>/
+    <project-root>/
       product-idea/
         current.md
         LATEST.json           <- {"version", "hash", "doc_path"}
@@ -83,8 +91,8 @@ Envelope schema (written by the skill, validated by `finalize`):
   "status": "READY" | "ERROR" | "BLOCKED_QUESTION" | "CONFLICT",
   "version": "1.0",
   "generated_at": "<ISO-8601, filled in by finalize if missing>",
-  "document_path": "design-docs/<project-id>/<doc-type>/v<version>.md-or-directory",
-  "data_path": "design-docs/<project-id>/<doc-type>/v<version>.data.json",   (optional but expected)
+  "document_path": "<project-root>/<doc-type>/v<version>.md-or-directory",
+  "data_path": "<project-root>/<doc-type>/v<version>.data.json",   (optional but expected)
   "inputs_consumed": {
       "<upstream-doc-type-or-product-idea>": {"version": "1.0", "hash": "sha256:..."}
       ...
@@ -108,20 +116,21 @@ Pipeline DAG (doc_type -> required input doc_types, next doc_type):
 import argparse
 import hashlib
 import json
+import os
+import platform
 import random
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-DESIGN_DOCS_ROOT = Path("design-docs")
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schema"
 
-# Set by main() once --project has been validated; every doc_dir()/read_latest()
-# call below operates relative to this. Deliberately a module global rather
-# than threaded through every function — this script is always a single,
-# short-lived CLI invocation, so that's a reasonable simplification, not a
-# footgun for concurrent use.
+# Set by main() once --project has been validated against the registry;
+# every doc_dir()/read_latest() call below operates relative to this.
+# Deliberately a module global rather than threaded through every
+# function — this script is always a single, short-lived CLI invocation,
+# so that's a reasonable simplification, not a footgun for concurrent use.
 ROOT = None
 
 PIPELINE = {
@@ -154,8 +163,8 @@ REQUIRED_ENVELOPE_FIELDS = [
 
 VALID_STATUSES = {"READY", "ERROR", "BLOCKED_QUESTION", "CONFLICT"}
 
-# Word lists for project IDs. Kept modest and G-rated; ~50 x ~50 = 2500
-# combinations before a collision retry is ever needed.
+# Word lists for project unique IDs. Kept modest and G-rated; ~50 x ~50 =
+# 2500 combinations before a collision retry is ever needed.
 ADJECTIVES = [
     "curious", "brave", "quiet", "cheerful", "bold", "gentle", "swift",
     "clever", "calm", "eager", "jolly", "kind", "lively", "mellow",
@@ -177,6 +186,48 @@ FOODS = [
     "iceberg", "jalapeno", "kumquat", "lemongrass", "muffin", "nutmeg",
     "onion", "pistachio",
 ]
+
+
+# ---------------------------------------------------------- storage root --
+
+def base_dir() -> Path:
+    """
+    Where project folders are created. DESIGN_PIPELINE_HOME overrides
+    everything (useful if the default location isn't writable in a given
+    environment). Otherwise: the user's home directory, or the root of
+    the C:\\ drive on Windows.
+    """
+    override = os.environ.get("DESIGN_PIPELINE_HOME")
+    if override:
+        return Path(override)
+    if platform.system() == "Windows":
+        return Path("C:/")
+    return Path.home()
+
+
+def registry_path() -> Path:
+    return base_dir() / ".design-pipeline" / "projects.json"
+
+
+def read_registry() -> dict:
+    p = registry_path()
+    if not p.exists():
+        return {}
+    return json.loads(p.read_text())
+
+
+def write_registry(data: dict):
+    p = registry_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def slugify(name: str) -> str:
+    if not name:
+        return "project"
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    slug = slug[:40].strip("-")
+    return slug or "project"
 
 
 # ---------------------------------------------------------------- hashing --
@@ -310,41 +361,62 @@ def cmd_resolve_project(args):
     PROJECT_NOT_FOUND (exit 1) — never silently creates a project for an
     ID the caller supplied, since IDs are minted by this tool, not chosen
     by users.
-    Without --project: mint a new adjective-food ID, create its directory,
-    and report NEW. This is the only way a new project comes into being.
+    Without --project: mint a new unique ID, create "<slug>-<id>" under
+    base_dir(), register it, and report NEW. This is the only way a new
+    project comes into being. --name supplies the human-readable slug
+    (e.g. "url-shortener"); omit it and the folder is just named
+    "project-<id>".
     """
+    registry = read_registry()
+
     if args.project:
-        root = DESIGN_DOCS_ROOT / args.project
-        if root.exists():
+        entry = registry.get(args.project)
+        if entry:
             print("EXISTING")
             print(json.dumps({"project_id": args.project, "status": "EXISTING",
-                               "path": str(root)}, indent=2))
+                               "path": entry["path"], "folder": entry["folder"]},
+                              indent=2))
         else:
             print(f"PROJECT_NOT_FOUND: no project '{args.project}' exists yet.")
             sys.exit(1)
         return
 
-    DESIGN_DOCS_ROOT.mkdir(parents=True, exist_ok=True)
-    existing = {p.name for p in DESIGN_DOCS_ROOT.iterdir() if p.is_dir()}
+    existing_ids = set(registry.keys())
     candidate = None
     for _ in range(200):
         attempt = f"{random.choice(ADJECTIVES)}-{random.choice(FOODS)}"
-        if attempt not in existing:
+        if attempt not in existing_ids:
             candidate = attempt
             break
     if candidate is None:
         candidate = f"{random.choice(ADJECTIVES)}-{random.choice(FOODS)}-{random.randint(2, 999)}"
 
-    root = DESIGN_DOCS_ROOT / candidate
+    slug = slugify(args.name)
+    folder_name = f"{slug}-{candidate}"
+    root = base_dir() / folder_name
     root.mkdir(parents=True, exist_ok=True)
+
+    registry[candidate] = {
+        "name": args.name or None,
+        "slug": slug,
+        "folder": folder_name,
+        "path": str(root),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    write_registry(registry)
+
     print("NEW")
-    print(json.dumps({"project_id": candidate, "status": "NEW", "path": str(root)}, indent=2))
+    print(json.dumps({"project_id": candidate, "status": "NEW",
+                       "path": str(root), "folder": folder_name}, indent=2))
 
 
 def cmd_list_projects(args):
-    DESIGN_DOCS_ROOT.mkdir(parents=True, exist_ok=True)
-    projects = sorted(p.name for p in DESIGN_DOCS_ROOT.iterdir() if p.is_dir())
-    print(json.dumps(projects, indent=2))
+    registry = read_registry()
+    result = [
+        {"project_id": pid, "name": entry.get("name"), "path": entry["path"]}
+        for pid, entry in sorted(registry.items())
+    ]
+    print(json.dumps(result, indent=2))
 
 
 # ---------------------------------------------------------------- commands --
@@ -620,15 +692,21 @@ def cmd_finalize(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project",
-                         help="Project ID (adjective-food, e.g. curious-mango). "
-                              "Required for every command except resolve-project "
-                              "and list-projects.")
+                         help="Project ID (e.g. curious-mango). Required for "
+                              "every command except resolve-project and "
+                              "list-projects. Must come BEFORE the subcommand.")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("resolve-project",
-                    help="No --project: mint a new project ID. "
-                         "With --project: confirm it exists.").set_defaults(
-        func=cmd_resolve_project)
+    p = sub.add_parser("resolve-project",
+                        help="No --project: mint a new project (optionally "
+                             "--name <short name>). With --project: confirm "
+                             "it exists.")
+    p.add_argument("--name", help="Short human-readable project name, used "
+                                   "to build the project folder's slug "
+                                   "(e.g. 'url-shortener'). Only used when "
+                                   "minting a new project.")
+    p.set_defaults(func=cmd_resolve_project)
+
     sub.add_parser("list-projects").set_defaults(func=cmd_list_projects)
 
     sub.add_parser("init").set_defaults(func=cmd_init)
@@ -680,17 +758,18 @@ def main():
     else:
         if not args.project:
             print("ERROR: --project <project-id> is required for this command.\n"
-                  "Ask the user for their project ID first. If they don't have one, "
-                  "run `resolve-project` with no --project to mint a new one.")
+                  "Ask the user for their project ID first. If they don't have "
+                  "one, run `resolve-project` (optionally with --name) to mint "
+                  "a new project.")
             sys.exit(2)
-        candidate_root = DESIGN_DOCS_ROOT / args.project
-        if not candidate_root.exists():
+        entry = read_registry().get(args.project)
+        if entry is None:
             print(f"ERROR: project '{args.project}' does not exist.\n"
-                  f"Run `resolve-project --project {args.project}` to double-check the "
-                  f"ID with the user, or omit --project on resolve-project to start a "
-                  f"new project instead.")
+                  f"Run `resolve-project --project {args.project}` to double-"
+                  f"check the ID with the user, or omit --project on "
+                  f"resolve-project to start a new project instead.")
             sys.exit(2)
-        ROOT = candidate_root
+        ROOT = Path(entry["path"])
 
     args.func(args)
 

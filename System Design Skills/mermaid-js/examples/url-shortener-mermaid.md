@@ -7,7 +7,7 @@ this particular design actually warrants).
 ## Output layout
 
 ```
-design-docs/mermaid-diagrams/
+<project-root>/mermaid-diagrams/
   v1.0/
     01-request-flow.mmd
     02-entity-relationship.mmd
@@ -17,7 +17,7 @@ design-docs/mermaid-diagrams/
   LATEST.json
 ```
 
-`document_path` in the envelope is the directory `design-docs/mermaid-diagrams/v1.0/`,
+`document_path` in the envelope is the directory `<project-root>/mermaid-diagrams/v1.0/`,
 not a single file — this is the one stage where that's true.
 
 ## 01-request-flow.mmd

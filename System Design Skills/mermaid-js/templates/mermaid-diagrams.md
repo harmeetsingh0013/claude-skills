@@ -1,5 +1,5 @@
 <!--
-This is the template for design-docs/mermaid-diagrams/v<version>/index.md —
+This is the template for <project-root>/mermaid-diagrams/v<version>/index.md —
 a human-readable index that lives INSIDE the version directory alongside
 the .mmd files (01-system-context.mmd, etc.). The directory as a whole is
 this stage's "document_path"; this index.md is not itself the document_path
