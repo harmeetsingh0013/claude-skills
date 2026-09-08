@@ -1,0 +1,110 @@
+{
+  "$id": "architecture-design.schema.json",
+  "title": "System Architecture & Design Document — data contract",
+  "type": "object",
+  "required": ["document_id", "product", "version", "created", "input_documents", "status", "adrs", "components", "diagram_specifications", "traceability"],
+  "properties": {
+    "document_id": {"type": "string", "minLength": 1},
+    "product": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "created": {"type": "string", "minLength": 1},
+    "input_documents": {
+      "type": "object",
+      "required": ["functional_requirements", "non_functional_requirements"],
+      "properties": {
+        "functional_requirements": {
+          "type": "object",
+          "required": ["version", "validation"],
+          "properties": {
+            "version": {"type": "string"},
+            "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+          }
+        },
+        "non_functional_requirements": {
+          "type": "object",
+          "required": ["version", "validation"],
+          "properties": {
+            "version": {"type": "string"},
+            "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+          }
+        }
+      }
+    },
+    "status": {"type": "string", "enum": ["READY_FOR_MERMAID", "BLOCKED", "CONFLICT"]},
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      }
+    },
+    "adrs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "driven_by"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^ADR-[0-9]{3,}$"},
+          "title": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "enum": ["Proposed", "Accepted", "Superseded"]},
+          "supersedes": {"type": "string"},
+          "driven_by": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "responsibility"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "responsibility": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "diagram_specifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "shows"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "type": {
+            "type": "string",
+            "enum": ["system-context", "container-architecture", "request-flow",
+                     "data-flow", "sequence-diagram", "deployment-architecture",
+                     "entity-relationship", "state-diagram"]
+          },
+          "shows": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "traceability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["requirement_id", "sections"],
+        "properties": {
+          "requirement_id": {"type": "string"},
+          "sections": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
