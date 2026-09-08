@@ -139,7 +139,33 @@ Set the same value in `data.json`'s `status` field
 (`READY_FOR_ARCHITECTURE` or `BLOCKED`), and list the same issues in
 `blocking_issues`.
 
+## Human review checkpoint — before writing anything to disk
+
+Quality-attribute numbers you've derived or assumed are exactly the kind
+of thing a user will want to sanity-check — a latency target, a
+compliance requirement, or an availability number you inferred might not
+match what they actually need.
+
+Draft the full document (and your intended Completeness Assessment)
+**directly in your response**, not to disk yet. Then explicitly ask
+something like: *"Here are the non-functional requirements derived from
+your FR document. Do these targets and constraints look right, and is
+there anything missing — a compliance requirement, a specific SLA, a
+constraint I should know about? If this looks good, I'll lock it in as
+v\<version\> and move on to architecture design."* Stop and wait for their
+reply in a new turn — don't write files or finalize in the same turn you
+present the draft.
+
+If they ask for changes, revise and ask again. Repeat until the user
+explicitly confirms this version, or explicitly tells you to proceed
+without further review. This applies even when the orchestrator invoked
+you — it decides *which* stages run, not whether this stage's content is
+correct.
+
 ## Finishing
+
+Once the user has confirmed the draft (or told you to proceed without
+further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version non-functional-requirements`
 2. Write `design-docs/<id>/non-functional-requirements/v<version>.md` and
@@ -154,4 +180,5 @@ Set the same value in `data.json`'s `status` field
    `"next_skill": "architecture-design"`.
 6. Run `python scripts/pipeline_tool.py --project <id> finalize design-docs/<id>/non-functional-requirements/v<version>.envelope.json`
 7. Report to the user the version produced, a short summary, and whether
-   `architecture-design` can now run.
+   `architecture-design` can now run — report this even if the
+   orchestrator invoked you, rather than silently continuing.

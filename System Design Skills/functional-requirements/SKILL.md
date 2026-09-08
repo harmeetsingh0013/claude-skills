@@ -121,7 +121,37 @@ Set the same value in `data.json`'s `status` field
 (`READY_FOR_NFR` or `BLOCKED`), and list the same issues in
 `blocking_issues`.
 
+## Human review checkpoint — before writing anything to disk
+
+A product idea is rarely complete on its own — the user may have
+additional capabilities, edge cases, or actors in mind that the idea as
+stated didn't spell out. Don't treat your first draft as final just
+because it's internally consistent.
+
+Draft the full document (and your intended Completeness Assessment)
+**directly in your response**, not to disk yet. Then explicitly ask
+something like: *"Here are the functional requirements I've drafted. Is
+there anything you'd like to add, remove, or change — any other
+capabilities, actors, or edge cases you had in mind? If this looks
+complete, I'll lock it in as v\<version\> and move on to non-functional
+requirements."* Then stop and wait for their reply in a new turn — don't
+write files or finalize in the same turn you present the draft, and don't
+treat an earlier "looks good, continue" from a different part of the
+conversation as approval for *this* draft.
+
+If they ask for changes or add requirements, revise the draft and ask
+again. Repeat until the user explicitly confirms this version, or
+explicitly tells you to proceed without further review. Only then move on
+to Finishing.
+
+This checkpoint applies even when you were invoked by the orchestrator:
+the orchestrator decides *which* stages run, but that's not a substitute
+for the user's own sign-off on what this stage actually produced.
+
 ## Finishing
+
+Once the user has confirmed the draft (or told you to proceed without
+further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version functional-requirements`
 2. Write `design-docs/<id>/functional-requirements/v<version>.md` (from the
@@ -139,7 +169,11 @@ Set the same value in `data.json`'s `status` field
 6. Run `python scripts/pipeline_tool.py --project <id> finalize design-docs/<id>/functional-requirements/v<version>.envelope.json`
 7. Report to the user: the project ID (if this was newly minted, remind
    them to save it), the version produced, a short summary, and — if
-   status is READY — that `non-functional-requirements` can now run.
+   status is READY — that `non-functional-requirements` can now run. If
+   you weren't invoked directly by the user (the orchestrator invoked you),
+   still report this back rather than silently continuing — the
+   orchestrator's own instructions have it check in with the user before
+   moving to the next stage.
 
 Your final output to the user/orchestrator is the document, the data file,
 and the envelope. Don't narrate your reasoning process as part of the

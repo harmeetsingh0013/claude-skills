@@ -111,7 +111,27 @@ synchronously or via an event), don't pick one to make the diagram look
 complete — render what's unambiguous and list the ambiguity in
 `limitations`, tied back to the relevant architecture section.
 
+## Human review checkpoint — before writing anything to disk
+
+Render each diagram **directly in your response** (as Mermaid code blocks),
+not to disk yet. Then ask something like: *"Here are the diagrams
+generated from the architecture design. Do these look right, or is there
+anything you'd like adjusted before I lock this in as v\<version\>?"* Stop
+and wait for their reply in a new turn.
+
+If they ask for changes, revise and ask again — remember this is
+extraction, not redesign, so a requested change that would alter the
+architecture itself (not just how it's drawn) should be redirected back to
+`architecture-design` rather than made here. Repeat until the user
+explicitly confirms, or explicitly tells you to proceed without further
+review. This applies even when the orchestrator invoked you. Since this is
+the pipeline's last stage, confirming here is the final sign-off on the
+whole design, not just a handoff to another stage.
+
 ## Finishing
+
+Once the user has confirmed the draft (or told you to proceed without
+further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version mermaid-diagrams`
 2. Write `design-docs/<id>/mermaid-diagrams/v<version>/` (the `.mmd` files +

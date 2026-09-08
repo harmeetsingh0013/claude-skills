@@ -99,25 +99,40 @@ then be stale relative to the new FR version. You don't need to manually
 figure out the downstream blast radius — just work through the plan in
 order and re-check it as you go (see Step 5).
 
-## Step 5: Execute the plan, one stage at a time, in order
+## Step 5: Execute the plan, one stage at a time — and stop between every stage
 
 For each stage marked `RUN`, in the order the plan lists them
 (functional-requirements, then non-functional-requirements, then
 architecture-design, then mermaid-js):
 
 1. Invoke that stage by following its own SKILL.md instructions, passing
-   along the same project ID — including its own `validate-data` check on
-   whatever it consumes; you don't need to re-validate on its behalf, but
-   do surface a `FAIL` result to the user if the stage reports one.
-2. Wait for it to finish and call its own `finalize`.
-3. Re-run `python scripts/pipeline_tool.py --project <id> plan` before
+   along the same project ID.
+2. **Every content stage's own SKILL.md includes a human review checkpoint
+   that pauses and asks the user about the draft before writing anything
+   or finalizing — let that happen.** Don't summarize the draft yourself
+   and answer on the user's behalf, don't tell the stage to skip its
+   checkpoint, and don't treat something the user said earlier in the
+   conversation (e.g. approving the *plan* to run the pipeline) as
+   approval of a *specific stage's content* it hasn't shown them yet.
+   Orchestrating the pipeline and approving what it produces are different
+   things — only the user does the second one.
+3. Once the stage finalizes (`status: "READY"`), **stop and check in with
+   the user before invoking the next stage**, even though its own
+   checkpoint already got their sign-off on the content. Something like:
+   *"Functional requirements are locked at v1.0. Ready for me to continue
+   with non-functional requirements, or would you like to pause here?"*
+   Wait for their answer before invoking the next stage — don't chain
+   straight through the whole plan in one uninterrupted sequence. This
+   gives the user control over pacing, not just content, and a natural
+   place to stop if they want to think something over.
+4. Re-run `python scripts/pipeline_tool.py --project <id> plan` before
    moving to the next stage — don't assume the plan you computed at the
    start is still accurate, since a stage's own output determines whether
    the next one actually needs to run (a rerun doesn't always change the
    resulting document's content in a way that matters, though in practice
    a version bump always changes the hash, so downstream stages will
    generally show `RUN` after any upstream `RUN`).
-4. If a stage finishes with `status: "ERROR"`, `"CONFLICT"`, or
+5. If a stage finishes with `status: "ERROR"`, `"CONFLICT"`, or
    `"BLOCKED_QUESTION"` instead of `"READY"`, stop executing the plan.
    Report the issue to the user (surface the envelope's `errors` or
    `blocking_questions` directly — don't paraphrase away the specifics)
@@ -127,7 +142,11 @@ architecture-design, then mermaid-js):
    would just produce a second, more confusing error.
 
 Stages marked `SKIP` or `BLOCKED` at the start need no action beyond what's
-already been reported.
+already been reported. If the user explicitly says something like "run the
+whole pipeline end to end without stopping to ask me," you can skip the
+per-stage check-in in Step 5.3 — but each stage's own content checkpoint
+still happens regardless, since that's about the content being correct,
+not about pacing.
 
 ## Step 6: Report status
 

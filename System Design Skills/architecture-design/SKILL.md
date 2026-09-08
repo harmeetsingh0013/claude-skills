@@ -167,7 +167,40 @@ Conflicts detected:
 Set the same value in `data.json`'s `status` field
 (`READY_FOR_MERMAID`, `BLOCKED`, or `CONFLICT`).
 
+## Human review checkpoint — before writing anything to disk
+
+This is the stage with the most consequential decisions in the whole
+pipeline — technology choices are expensive to unwind later, and the user
+may have constraints (a preferred cloud provider, an existing system to
+integrate with, a team's existing expertise) that never showed up in the
+FR or NFR documents because nothing asked about them there.
+
+Draft the full document **directly in your response**, not to disk yet.
+At minimum, walk through the key decisions and ADRs, not just a "done!" —
+the user needs enough to actually evaluate it. Then explicitly ask
+something like: *"Here's the architecture design, including the key
+decisions in ADR-1 through ADR-N. Do these technology choices work for
+you — any constraints I should account for, or anything you'd change
+before I lock this in as v\<version\> and hand off to diagram generation?"*
+Stop and wait for their reply in a new turn — don't write files or
+finalize in the same turn you present the draft.
+
+If they push back on a decision, treat that the same way you'd treat a new
+constraint: revise the relevant ADR (superseding it, not silently editing
+it, per `references/adr-format.md`) and ask again. Repeat until the user
+explicitly confirms this version, or explicitly tells you to proceed
+without further review. This applies even when the orchestrator invoked
+you.
+
+If your Completeness Assessment is `CONFLICT`, present the conflict report
+itself for this checkpoint — the question becomes "which side should
+change, or how would you like to reconcile this?" rather than "does this
+design look right?"
+
 ## Finishing
+
+Once the user has confirmed the draft (or told you to proceed without
+further review):
 
 1. Get your version: `python scripts/pipeline_tool.py --project <id> next-version architecture-design`
 2. Write `design-docs/<id>/architecture-design/v<version>.md` and
@@ -184,4 +217,6 @@ Set the same value in `data.json`'s `status` field
    since re-running after the conflict is resolved still leads there).
 6. Run `python scripts/pipeline_tool.py --project <id> finalize design-docs/<id>/architecture-design/v<version>.envelope.json`
 7. Report to the user the version produced, a short summary, whether any
-   conflicts were found, and whether `mermaid-js` can now run.
+   conflicts were found, and whether `mermaid-js` can now run — report
+   this even if the orchestrator invoked you, rather than silently
+   continuing.
