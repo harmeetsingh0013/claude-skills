@@ -24,27 +24,43 @@ present or absent is itself the signal that tells you which case you're
 in — that's the whole point of asking:
 
 1. **Check whether the user already gave you one** in their current
-   message (looks like `word-word`, e.g. `curious-mango`). If so, skip to
-   step 3.
-2. **Otherwise, ask:** *"Is this a new project, or do you have an existing
-   project ID? If it's new, what should I call it — a short name is
+   message (looks like `word-word`, e.g. `curious-mango`) — or a path to
+   an existing project's documents. If they gave an ID, skip to step 3; if
+   a path, skip to step 4.
+2. **Otherwise, ask:** *"Is this a new project, do you have an existing
+   project ID, or do you have the path to an existing project's
+   documents? If it's new, what should I call it — a short name is
    fine."*
    - **New:** `python scripts/pipeline_tool.py resolve-project --name "<short name>"`
      (no `--project`; omit `--name` if the user didn't give one). This
      mints an ID, creates its folder, and registers it — tell the user the
      new ID and that they should hang onto it to resume later (the name
      alone won't be enough to resume; resuming works through the ID).
-   - **Existing, but they don't remember the exact ID:** run
+   - **Existing, but they don't remember the exact ID or a path:** run
      `python scripts/pipeline_tool.py list-projects` and show them the
-     list (with names) rather than guessing.
+     list (with names and paths) rather than guessing.
 3. **If they gave you an ID, confirm it before trusting it:**
    `python scripts/pipeline_tool.py resolve-project --project <id>`.
    - `EXISTING` → this is a returning project; proceed to Step 2 below,
      which will naturally figure out what (if anything) needs to run to
      bring it up to date — don't assume everything needs regenerating.
    - `PROJECT_NOT_FOUND` → tell the user plainly, and ask whether they
-     mistyped it or actually want to start fresh. Don't silently mint a
-     new ID as a fallback.
+     mistyped it, have a path instead (go to step 4), or actually want to
+     start fresh. Don't silently mint a new ID as a fallback.
+4. **If they gave you a path instead** (or the ID above wasn't found and
+   they have a path handy — e.g. the registry was lost, or this folder was
+   copied from another machine): `python scripts/pipeline_tool.py resolve-project --path "<path>"`.
+   - `EXISTING` → already registered; use the `project_id` it returns.
+   - `ADOPTED` → newly registered from that folder, and it does contain
+     real pipeline documents. Tell the user the resulting `project_id` —
+     especially if `id_inferred_from_folder_name` is `false`, since that
+     means a fresh ID was minted and won't match anything they remember.
+   - `ADOPTED_EMPTY` → registered, but the folder doesn't actually contain
+     any pipeline documents. Flag this rather than proceeding as if it
+     were a normal resume — confirm with the user this is really the
+     right path before treating it as an existing project.
+   - `PATH_NOT_FOUND` → tell the user plainly and ask for a corrected path
+     or an ID instead.
 
 Documents for this project are written to a dedicated folder outside
 whatever directory this session happens to be running in — the user's
@@ -54,7 +70,8 @@ includes the exact `path`; you don't need to do anything with it yourself; each 
 
 Every `pipeline_tool.py` call for the rest of this run uses
 `--project <id>` (placed **before** the subcommand — see
-`references/pipeline-conventions.md`).
+`references/pipeline-conventions.md`). The path itself, if one was given,
+is only ever used at this resolution step.
 
 ## Why this needs an orchestrator at all
 
@@ -188,12 +205,15 @@ work implied: read `is_final` from the latest `functional-requirements`
 finishes, since it's carried through — see each stage's own SKILL.md).
 
 - **`is_final: false`** — there's more scope deferred to future MVPs.
-  Tell the user what MVP just shipped and what's still deferred (the FR
-  document's `deferred` list), then ask something like: *"MVP \<N\> is
-  complete end-to-end. Want me to start MVP \<N+1\> with the next batch of
-  requirements, or are we done here for now?"* If they say yes, go back to
-  Step 3 with "the user wants the next MVP" as the recorded input, and run
-  the pipeline again from `functional-requirements`.
+  Check the backlog for a fuller picture than the FR document's `deferred`
+  snapshot: `python scripts/pipeline_tool.py --project <id> backlog-list functional-requirements`.
+  Tell the user what MVP just shipped and what's pending on the backlog,
+  then ask something like: *"MVP \<N\> is complete end-to-end. On the
+  backlog for next time: \<items\>. Want me to start MVP \<N+1\>, and
+  should I just prioritize from the backlog myself or is there something
+  specific you want pulled in first?"* If they say yes, go back to Step 3
+  with "the user wants the next MVP" as the recorded input, and run the
+  pipeline again from `functional-requirements`.
 - **`is_final: true`** — nothing's deferred; the product's full scope (as
   currently understood) is built out. Say so plainly rather than asking
   about a next MVP that doesn't exist yet.

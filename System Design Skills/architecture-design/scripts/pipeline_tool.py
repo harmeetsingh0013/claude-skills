@@ -360,6 +360,71 @@ def next_version(previous_version):
     return f"{v:.1f}"
 
 
+# --------------------------------------------------------------- backlog --
+# A lightweight, persistent list of candidate items for a doc-type that
+# didn't make it into the current MVP round (or that the user added
+# directly). This is separate from a document's own `deferred` array
+# (which is just a snapshot at the time that version was written) —
+# backlog.json is the living state a skill reads from FIRST when picking
+# the next MVP's batch, and the user can add to it anytime without
+# triggering a full document regeneration. Not schema-validated like a
+# document's data.json — this is tool-managed state, the same category as
+# LATEST.json.
+
+def backlog_path(doc_type: str) -> Path:
+    return doc_dir(doc_type) / "backlog.json"
+
+
+def read_backlog(doc_type: str) -> list:
+    p = backlog_path(doc_type)
+    if not p.exists():
+        return []
+    return json.loads(p.read_text())
+
+
+def write_backlog(doc_type: str, items: list):
+    backlog_path(doc_type).write_text(json.dumps(items, indent=2) + "\n")
+
+
+def cmd_backlog_add(args):
+    items = read_backlog(args.doc_type)
+    existing_nums = [int(i["id"].split("-")[-1]) for i in items if i["id"].startswith("BL-")]
+    next_num = max(existing_nums, default=0) + 1
+    item = {
+        "id": f"BL-{next_num}",
+        "text": args.text,
+        "source": args.source,
+        "status": "pending",
+        "added_at": datetime.now(timezone.utc).isoformat(),
+    }
+    items.append(item)
+    write_backlog(args.doc_type, items)
+    print("ADDED")
+    print(json.dumps(item, indent=2))
+
+
+def cmd_backlog_list(args):
+    items = read_backlog(args.doc_type)
+    if not args.all:
+        items = [i for i in items if i["status"] == "pending"]
+    print(json.dumps(items, indent=2))
+
+
+def cmd_backlog_resolve(args):
+    items = read_backlog(args.doc_type)
+    for item in items:
+        if item["id"] == args.id:
+            item["status"] = args.status
+            if args.resulting_id:
+                item["resulting_id"] = args.resulting_id
+            write_backlog(args.doc_type, items)
+            print("RESOLVED")
+            print(json.dumps(item, indent=2))
+            return
+    print(f"ERROR: backlog item {args.id!r} not found for '{args.doc_type}'")
+    sys.exit(1)
+
+
 # ------------------------------------------------------------- projects --
 
 def cmd_resolve_project(args):
@@ -368,11 +433,20 @@ def cmd_resolve_project(args):
     PROJECT_NOT_FOUND (exit 1) — never silently creates a project for an
     ID the caller supplied, since IDs are minted by this tool, not chosen
     by users.
-    Without --project: mint a new unique ID, create "<slug>-<id>" under
-    base_dir(), register it, and report NEW. This is the only way a new
-    project comes into being. --name supplies the human-readable slug
-    (e.g. "url-shortener"); omit it and the folder is just named
-    "project-<id>".
+    With --path (and no --project): adopt an existing folder of design
+    documents that isn't in the registry yet — e.g. copied from another
+    machine, or the registry was lost/rebuilt. If that exact path is
+    already registered, behaves like EXISTING. Otherwise, tries to infer a
+    project ID from the folder name (a "<slug>-<adjective>-<food>" folder
+    yields the trailing "<adjective>-<food>" as its ID); if that can't be
+    inferred or is already taken, mints a fresh ID for it instead — either
+    way, registers the path and reports ADOPTED so the caller can tell the
+    user which ID to use going forward.
+    With neither: mint a new unique ID, create "<slug>-<id>" under
+    base_dir(), register it, and report NEW. This is the only way a
+    brand-new project comes into being. --name supplies the
+    human-readable slug (e.g. "url-shortener"); omit it and the folder is
+    just named "project-<id>".
     """
     registry = read_registry()
 
@@ -386,6 +460,65 @@ def cmd_resolve_project(args):
         else:
             print(f"PROJECT_NOT_FOUND: no project '{args.project}' exists yet.")
             sys.exit(1)
+        return
+
+    if args.path:
+        path = Path(args.path).expanduser().resolve()
+        if not path.is_dir():
+            print(f"PATH_NOT_FOUND: {path} does not exist or is not a directory.")
+            sys.exit(1)
+
+        for pid, entry in registry.items():
+            if Path(entry["path"]).resolve() == path:
+                print("EXISTING")
+                print(json.dumps({"project_id": pid, "status": "EXISTING",
+                                   "path": str(path), "folder": entry["folder"]},
+                                  indent=2))
+                return
+
+        known_doc_types = list(PIPELINE.keys()) + ["product-idea"]
+        looks_like_project = any((path / dt).is_dir() for dt in known_doc_types)
+
+        folder_name = path.name
+        parts = folder_name.split("-")
+        inferred_id = None
+        slug = folder_name
+        if len(parts) >= 3:
+            candidate_id = "-".join(parts[-2:])
+            if candidate_id not in registry:
+                inferred_id = candidate_id
+                slug = "-".join(parts[:-2]) or "project"
+
+        if inferred_id:
+            new_id = inferred_id
+        else:
+            existing_ids = set(registry.keys())
+            new_id = None
+            for _ in range(200):
+                attempt = f"{random.choice(ADJECTIVES)}-{random.choice(FOODS)}"
+                if attempt not in existing_ids:
+                    new_id = attempt
+                    break
+            if new_id is None:
+                new_id = f"{random.choice(ADJECTIVES)}-{random.choice(FOODS)}-{random.randint(2, 999)}"
+            slug = slugify(folder_name)
+
+        registry[new_id] = {
+            "name": None,
+            "slug": slug,
+            "folder": folder_name,
+            "path": str(path),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "adopted_from_path": True,
+        }
+        write_registry(registry)
+
+        status = "ADOPTED" if looks_like_project else "ADOPTED_EMPTY"
+        print(status)
+        print(json.dumps({
+            "project_id": new_id, "status": status, "path": str(path),
+            "folder": folder_name, "id_inferred_from_folder_name": inferred_id is not None,
+        }, indent=2))
         return
 
     existing_ids = set(registry.keys())
@@ -705,13 +838,18 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("resolve-project",
-                        help="No --project: mint a new project (optionally "
-                             "--name <short name>). With --project: confirm "
-                             "it exists.")
+                        help="No args: mint a new project (optionally "
+                             "--name <short name>). --project <id>: confirm "
+                             "it exists. --path <path>: adopt an existing "
+                             "design-docs folder not yet in the registry.")
     p.add_argument("--name", help="Short human-readable project name, used "
                                    "to build the project folder's slug "
                                    "(e.g. 'url-shortener'). Only used when "
-                                   "minting a new project.")
+                                   "minting a brand-new project.")
+    p.add_argument("--path", help="Path to an existing project folder to "
+                                   "adopt (e.g. copied from another machine, "
+                                   "or the registry was lost). Ignored if "
+                                   "--project is also given.")
     p.set_defaults(func=cmd_resolve_project)
 
     sub.add_parser("list-projects").set_defaults(func=cmd_list_projects)
@@ -752,6 +890,28 @@ def main():
     p.set_defaults(func=cmd_needs_rerun)
 
     sub.add_parser("plan").set_defaults(func=cmd_plan)
+
+    p = sub.add_parser("backlog-add",
+                        help="Add a candidate item to a doc-type's backlog "
+                             "(deferred-by-skill or user-added)")
+    p.add_argument("doc_type")
+    p.add_argument("--text", required=True, help="Short description of the candidate item")
+    p.add_argument("--source", choices=["skill", "user"], default="skill")
+    p.set_defaults(func=cmd_backlog_add)
+
+    p = sub.add_parser("backlog-list", help="List backlog items for a doc-type")
+    p.add_argument("doc_type")
+    p.add_argument("--all", action="store_true",
+                    help="Include resolved (included/dropped) items, not just pending")
+    p.set_defaults(func=cmd_backlog_list)
+
+    p = sub.add_parser("backlog-resolve",
+                        help="Mark a backlog item included or dropped")
+    p.add_argument("doc_type")
+    p.add_argument("--id", required=True, help="Backlog item ID, e.g. BL-3")
+    p.add_argument("--status", required=True, choices=["included", "dropped"])
+    p.add_argument("--resulting-id", help="The FR-N/NFR-N this became, if included")
+    p.set_defaults(func=cmd_backlog_resolve)
 
     p = sub.add_parser("finalize")
     p.add_argument("envelope_path")

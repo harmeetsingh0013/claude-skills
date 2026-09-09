@@ -2,7 +2,8 @@
 
 Five Claude Code skills that turn a product idea into a fully specified,
 diagrammed system design — each stage gated on the previous one being
-genuinely complete, not just present.
+genuinely complete, not just present, and built up in small MVP-sized
+batches rather than all at once (see section 4).
 
 ```
 functional-requirements → non-functional-requirements → architecture-design → mermaid-js
@@ -92,6 +93,12 @@ later rather than starting over.
   enough to resume, since it's not guaranteed unique on its own.
 - **Existing project:** give it your ID. The skill confirms it exists,
   then checks what — if anything — actually needs to be regenerated.
+- **Existing project, but you only have a path, not the ID** (copied the
+  folder from another machine, lost track of the ID, or the registry got
+  wiped): give the skill the path instead. It'll look for that folder,
+  register it if it isn't already, and tell you the ID to use from then
+  on — it can often recover the original ID straight from the folder name,
+  but if it can't, it mints a fresh one and tells you so.
 
 Documents are versioned (`v1.0`, `v1.1`, ...) and **never edited in
 place**. A new version is always a new pair of files. Editing an upstream
@@ -128,7 +135,53 @@ default location isn't writable in your environment, set the
 
 ---
 
-## 4. What each skill does
+## 4. MVP-sized iterations
+
+The pipeline doesn't try to fully specify a product in one pass. Each
+round produces a small, reviewable batch instead of everything at once:
+
+- **functional-requirements** picks the ~10 most important requirements
+  for this round (a hard ceiling of 12 is schema-enforced — a batch
+  that's too big gets rejected, not just discouraged), lists everything
+  else it identified as "Deferred to future MVPs," and asks for your
+  approval before locking it in.
+- **non-functional-requirements** only derives quality attributes for the
+  requirements that are new this round — earlier MVPs' NFRs carry forward
+  untouched.
+- **architecture-design** designs only for what's actually in scope now —
+  no speculative infrastructure for deferred requirements that haven't
+  been approved yet.
+- **mermaid-js** just carries the MVP label through; it doesn't make its
+  own scoping decisions.
+
+Every document's `data.json` carries an `mvp` object (`number`,
+`is_final`, and for FR/NFR, counts and a `deferred` list) so every stage
+— and you — can tell which round something belongs to and whether more
+are coming. `is_final: true` only appears once nothing meaningful is left
+deferred.
+
+**Extras don't just disappear — they go on a backlog, and the skill tells
+you about them.** Anything that doesn't fit in a round's ~10 items is
+added to a persistent backlog (`backlog.json` per document type) rather
+than silently dropped, and the skill actively surfaces it during review:
+*"Here's the top 10 for MVP 1 — I'd also suggest keeping an eye on
+\<X, Y, Z\> for later, or I can pull one in now instead."* You can also
+add to the backlog directly at any time ("add social login to the
+backlog") without triggering a full requirements round. When the next MVP
+starts, the skill checks the backlog first, before thinking up anything
+new.
+
+Requirement numbering is **cumulative across MVPs**, not reset each round
+— MVP 2's new requirements pick up where MVP 1 left off (FR-010, FR-011,
+...), and MVP 1's requirements are carried forward unchanged.
+
+Once a full cycle (FR → NFR → architecture → diagrams) finishes, the
+orchestrator checks whether anything was deferred and, if so, offers to
+start the next MVP — you don't have to remember to ask.
+
+---
+
+## 5. What each skill does
 
 ### `design-pipeline-orchestrator`
 Doesn't write anything itself. Resolves the project ID, computes a `plan`
@@ -173,7 +226,7 @@ reports which diagrams were tool-validated versus only manually reviewed.
 
 ---
 
-## 5. Typical usage
+## 6. Typical usage
 
 **Starting a brand-new product:**
 > "I want to build a URL shortener for small teams with click analytics.
@@ -200,7 +253,7 @@ anything's stale.
 
 ---
 
-## 6. If something stops
+## 7. If something stops
 
 - **`BLOCKED`** — a stage couldn't derive something and needs a specific
   question answered (listed explicitly). Answer it and re-run that stage.

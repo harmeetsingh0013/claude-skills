@@ -18,8 +18,9 @@ haven't already.
 
 Before anything else, work out which project this is —
 `references/pipeline-conventions.md` has the exact procedure (check
-conversation for an existing ID, otherwise ask the user whether it's new
-or existing, then confirm via `resolve-project`). This skill is never the
+conversation for an existing ID or a path to existing documents,
+otherwise ask the user whether it's new/existing/a path, then confirm via
+`resolve-project`). This skill is never the
 first stage run for a brand-new project, so you should normally be
 *confirming* an ID the user already has. Every `pipeline_tool.py` call
 below assumes a confirmed `--project <id>`, placed **before** the

@@ -14,8 +14,9 @@ haven't already.
 
 Before anything else, work out which project this is —
 `references/pipeline-conventions.md` has the exact procedure (check
-conversation for an existing ID, otherwise ask the user whether it's new
-or existing, then confirm via `resolve-project`). This skill is never the
+conversation for an existing ID or a path to existing documents,
+otherwise ask the user whether it's new/existing/a path, then confirm via
+`resolve-project`). This skill is never the
 first stage run for a brand-new project (functional-requirements always
 runs first), so you should normally be *confirming* an ID the user already
 has rather than minting one — if the user seems to be starting completely
@@ -78,15 +79,20 @@ round, you'll typically derive a similar order of new NFRs. Still, treat
 batch larger than that. If a single new FR implies more than a handful of
 NFRs on its own, that's fine; if the *total* new NFRs this round would
 exceed the ceiling, prioritize the most consequential ones (the ones that
-would most affect architecture-design's decisions) and defer the rest —
-note deferred ones in "NFR Open Questions" rather than silently dropping
-them.
+would most affect architecture-design's decisions), and put the rest on
+the backlog rather than silently dropping them:
+`python scripts/pipeline_tool.py --project <id> backlog-add non-functional-requirements --text "..." --source skill`
+— check `backlog-list non-functional-requirements` first, the same way
+functional-requirements does, in case a past round already deferred
+something relevant here. Surface backlog items during the human review
+checkpoint below, same as functional-requirements does.
 
 Set your own `mvp.number` to match the FR document's `mvp.number`. If
 you're only correcting an existing NFR (not deriving from newly-added
 FRs), keep the same `mvp.number` as your previous version. Set
 `mvp.is_final` to true only when the FR document's `mvp.is_final` is also
-true and you've derived NFRs for everything in it.
+true, the NFR backlog is empty (or everything left in it was explicitly
+dropped), and you've derived NFRs for everything in scope.
 
 ## How to derive NFRs from FRs
 
@@ -181,18 +187,20 @@ match what they actually need.
 Draft the full document (and your intended Completeness Assessment)
 **directly in your response**, not to disk yet. Then explicitly ask
 something like: *"Here are the non-functional requirements derived from
-your FR document. Do these targets and constraints look right, and is
-there anything missing — a compliance requirement, a specific SLA, a
-constraint I should know about? If this looks good, I'll lock it in as
-v\<version\> and move on to architecture design."* Stop and wait for their
-reply in a new turn — don't write files or finalize in the same turn you
-present the draft.
+your FR document. \<If anything's on the backlog: I've also flagged
+\<items\> as worth considering — want any of those folded in now?\> Do
+these targets and constraints look right, and is there anything missing —
+a compliance requirement, a specific SLA, a constraint I should know
+about? If this looks good, I'll lock it in as v\<version\> and move on to
+architecture design."* Stop and wait for their reply in a new turn — don't
+write files or finalize in the same turn you present the draft.
 
-If they ask for changes, revise and ask again. Repeat until the user
-explicitly confirms this version, or explicitly tells you to proceed
-without further review. This applies even when the orchestrator invoked
-you — it decides *which* stages run, not whether this stage's content is
-correct.
+If they ask for changes or want a backlog item folded in, revise and ask
+again (resolve the backlog item per Finishing, and check the batch is
+still within the cap). Repeat until the user explicitly confirms this
+version, or explicitly tells you to proceed without further review. This
+applies even when the orchestrator invoked you — it decides *which*
+stages run, not whether this stage's content is correct.
 
 ## Finishing
 
@@ -203,15 +211,22 @@ further review):
 2. Write `<project-root>/non-functional-requirements/v<version>.md` and
    `<project-root>/non-functional-requirements/v<version>.data.json`
    (`<project-root>` is the `path` from Step 1's `resolve-project` output).
-3. Record `inputs_consumed`: the `functional-requirements` version + hash
+   Set `deferred`-equivalent context (NFR Open Questions) from the current
+   pending backlog after the resolutions in step 3.
+3. Resolve the backlog: for every backlog item that made it into this
+   round, `backlog-resolve non-functional-requirements --id BL-N --status
+   included --resulting-id NFR-0NN`. For anything newly identified as
+   out-of-scope this round, `backlog-add ... --source skill`. Leave
+   everything else pending.
+4. Record `inputs_consumed`: the `functional-requirements` version + hash
    from the `check-ready` output above.
-4. Validate your own data file:
+5. Validate your own data file:
    `python scripts/pipeline_tool.py --project <id> validate-data non-functional-requirements --path <project-root>/non-functional-requirements/v<version>.data.json`
-5. Write the envelope to `<project-root>/non-functional-requirements/v<version>.envelope.json`,
+6. Write the envelope to `<project-root>/non-functional-requirements/v<version>.envelope.json`,
    mapping your Completeness Assessment status per
    `references/pipeline-conventions.md`'s table, with
    `"next_skill": "architecture-design"`.
-6. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/non-functional-requirements/v<version>.envelope.json`
-7. Report to the user the version produced, a short summary, and whether
+7. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/non-functional-requirements/v<version>.envelope.json`
+8. Report to the user the version produced, a short summary, and whether
    `architecture-design` can now run — report this even if the
    orchestrator invoked you, rather than silently continuing.

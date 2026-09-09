@@ -17,10 +17,12 @@ shares.
 Before anything else, work out which project this is —
 `references/pipeline-conventions.md` has the exact procedure. Since this is
 usually the first stage invoked for a brand-new product, you're often the
-one asking "new or existing, and if new, what should I call it?" and
-minting the ID via `resolve-project --name "<short name>"`. Every
-`pipeline_tool.py` call below assumes you've done this and shows
-`--project <id>` accordingly — always place it **before** the subcommand.
+one asking "new project, existing ID, or a path to existing documents?"
+and minting the ID via `resolve-project --name "<short name>"` for a new
+one (or `resolve-project --path "<path>"` to adopt an existing folder that
+isn't registered yet — see conventions doc). Every `pipeline_tool.py` call
+below assumes you've done this and shows `--project <id>` accordingly —
+always place it **before** the subcommand.
 
 A project ID being already present when the user starts talking to you is
 itself informative: it means you're likely resuming, not starting fresh —
@@ -66,26 +68,37 @@ the user to review meaningfully, and it front-loads decisions (priority,
 scope) that are easier to make well in smaller batches with real feedback
 in between. Instead:
 
-1. **Think through the full scope first, privately** — identify everything
-   the idea implies, so your prioritization is informed by the whole
-   picture, not just whatever comes to mind first.
-2. **Select the ~10 most important requirements for this round** — the
+1. **Check the backlog first**: `python scripts/pipeline_tool.py --project <id> backlog-list functional-requirements`.
+   Anything pending there is a candidate for this round before you think
+   up anything new — items land there because a past round suggested them
+   and they didn't fit, or because the user added them directly between
+   sessions.
+2. **Think through the full scope, privately** — combine the backlog with
+   anything new the current idea/conversation implies, so your
+   prioritization is informed by the whole picture, not just whatever
+   comes to mind first.
+3. **Select the ~10 most important requirements for this round** — the
    ones that are foundational (other capabilities depend on them),
    highest priority, or make up a coherent, shippable slice on their own.
    Target 10; treat 12 as a hard ceiling — `finalize` will reject a batch
    larger than that (`mvp.new_in_this_mvp` is schema-capped at 12), so if
    you're tempted to go bigger, that's a sign to split into two rounds
    instead.
-3. **List everything else as deferred**, by name only, in the "Deferred to
-   future MVPs" part of the MVP Scope section — this isn't wasted work,
-   it's what makes the next round's starting point clear to both you and
-   the user.
-4. **Number continuously across rounds.** If the previous version's `mvp`
+4. **Actively suggest what didn't make the cut — don't just silently defer
+   it.** For everything else you identified (from the backlog or newly
+   thought of), add it to the backlog if it isn't already there:
+   `python scripts/pipeline_tool.py --project <id> backlog-add functional-requirements --text "..." --source skill`
+   You'll surface this list by name during the human review checkpoint
+   below — the point is to give the user a real choice about what's in
+   this round, not to bury good ideas in a "deferred" footnote they might
+   not read closely.
+5. **Number continuously across rounds.** If the previous version's `mvp`
    object shows `total_included: 9`, this round's new requirements start
    at FR-010, not FR-001 — figure out the highest existing FR-N from the
    previous `data.json`'s `requirements` array.
-5. **Mark `is_final: true`** only when there's genuinely nothing left
-   worth deferring — i.e., this round's requirements plus everything
+6. **Mark `is_final: true`** only when there's genuinely nothing left
+   worth deferring — i.e., the backlog is empty (or everything left in it
+   was explicitly dropped) and this round's requirements plus everything
    already included cover what the idea implies. Most first rounds should
    be `is_final: false`.
 
@@ -96,6 +109,12 @@ operation here, just distinguished by whether you're adding a new batch
 `mvp.number` as before, since you're not adding new scope). If the user
 asks you to fix or reword an existing FR rather than add new ones, that's
 the latter case — don't bump the MVP number for a correction.
+
+If the user just wants to add something to the backlog without running a
+full round (e.g. "add social login to the backlog for later"), that's a
+lightweight operation — `backlog-add ... --source user`, then confirm.
+It doesn't touch any finalized document or bump a version, so it doesn't
+need the human review checkpoint below.
 
 ## Scope discipline
 
@@ -182,24 +201,29 @@ field that answers that question; most rounds will be `READY_FOR_NFR` with
 A product idea is rarely complete on its own — the user may have
 additional capabilities, edge cases, or actors in mind that the idea as
 stated didn't spell out. Don't treat your first draft as final just
-because it's internally consistent.
+because it's internally consistent, and don't leave the backlog as a
+buried afterthought — surface it as an active suggestion.
 
 Draft the full document (and your intended Completeness Assessment)
-**directly in your response**, not to disk yet. Then explicitly ask
-something like: *"Here are the top \<N\> functional requirements I'd
-prioritize for MVP \<number\> — FR-\<X\> through FR-\<Y\>. I've deferred
-\<list/count\> other capabilities to future MVPs (see below). Does this
-batch look right, any swaps or additions before I lock it in as
-v\<version\> and move on to non-functional requirements?"* Then stop and
-wait for their reply in a new turn — don't write files or finalize in the
-same turn you present the draft, and don't treat an earlier "looks good,
-continue" from a different part of the conversation as approval for *this*
-draft.
+**directly in your response**, not to disk yet. Then explicitly present
+both the batch and the backlog, and ask for a decision on both — something
+like: *"Here are the top \<N\> functional requirements I'd prioritize for
+MVP \<number\> — FR-\<X\> through FR-\<Y\>. I'd also suggest keeping an
+eye on these for later (or pulling one into this round instead):
+\<backlog items by name\>. Does this batch look right — any swaps,
+additions, or backlog items you'd rather include now — before I lock it
+in as v\<version\> and move on to non-functional requirements?"* Then stop
+and wait for their reply in a new turn — don't write files or finalize in
+the same turn you present the draft, and don't treat an earlier "looks
+good, continue" from a different part of the conversation as approval for
+*this* draft.
 
-If they ask for changes or add requirements, revise the draft and ask
-again. Repeat until the user explicitly confirms this version, or
-explicitly tells you to proceed without further review. Only then move on
-to Finishing.
+If they ask for changes, add requirements, or want to swap a backlog item
+in, revise the draft and ask again (swapping a backlog item in means
+resolving it — see Finishing — and something else may need to move to the
+backlog to stay within the cap). Repeat until the user explicitly confirms
+this version, or explicitly tells you to proceed without further review.
+Only then move on to Finishing.
 
 This checkpoint applies even when you were invoked by the orchestrator:
 the orchestrator decides *which* stages run, but that's not a substitute
@@ -214,18 +238,25 @@ further review):
 2. Write `<project-root>/functional-requirements/v<version>.md` (from the
    template) and `<project-root>/functional-requirements/v<version>.data.json`
    (per the schema) — `<project-root>` is the `path` from Step 1's
-   `resolve-project` output.
-3. Hash the product idea input: `python scripts/pipeline_tool.py --project <id> latest product-idea`
+   `resolve-project` output. Set the `deferred` field in `data.json` to the
+   current pending backlog items' text (after the resolutions in step 3).
+3. Resolve the backlog: for every backlog item that made it into this
+   round, `backlog-resolve functional-requirements --id BL-N --status
+   included --resulting-id FR-0NN`. For anything newly identified as
+   out-of-scope this round that isn't already on the backlog, `backlog-add
+   ... --source skill` (see "Work in MVP-sized batches"). Leave everything
+   else pending.
+4. Hash the product idea input: `python scripts/pipeline_tool.py --project <id> latest product-idea`
    (use its `hash` and `version` in your envelope's `inputs_consumed`).
-4. Validate your own data file before finalizing:
+5. Validate your own data file before finalizing:
    `python scripts/pipeline_tool.py --project <id> validate-data functional-requirements --path <project-root>/functional-requirements/v<version>.data.json`
    — fix any reported errors before proceeding.
-5. Write the envelope to `<project-root>/functional-requirements/v<version>.envelope.json`
+6. Write the envelope to `<project-root>/functional-requirements/v<version>.envelope.json`
    per `references/pipeline-conventions.md`'s schema, mapping your
    Completeness Assessment status to the envelope `status` per that doc's
    mapping table, with `"next_skill": "non-functional-requirements"`.
-6. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/functional-requirements/v<version>.envelope.json`
-7. Report to the user: the project ID (if this was newly minted, remind
+7. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/functional-requirements/v<version>.envelope.json`
+8. Report to the user: the project ID (if this was newly minted, remind
    them to save it), the version produced, a short summary, and — if
    status is READY — that `non-functional-requirements` can now run. If
    you weren't invoked directly by the user (the orchestrator invoked you),

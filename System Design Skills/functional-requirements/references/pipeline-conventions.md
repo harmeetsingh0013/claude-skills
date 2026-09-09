@@ -31,19 +31,23 @@ this:
 1. **Check whether the user already gave you one** in their current
    message or earlier in this conversation (it looks like
    `word-word`). If so, skip to step 3.
-2. **Otherwise, ask.** Something like: *"Is this a new project, or do you
-   have an existing project ID (looks like `curious-mango`)? If it's new,
-   what should I call it — a short name like 'url-shortener' is fine."*
+2. **Otherwise, ask.** Something like: *"Is this a new project, do you
+   have an existing project ID (looks like `curious-mango`), or do you
+   have the path to an existing project's documents? If it's new, what
+   should I call it — a short name like 'url-shortener' is fine."*
    - **New project:** run
      `python scripts/pipeline_tool.py resolve-project --name "<short name>"`
      with no `--project` (omit `--name` if the user didn't give one). It
      mints an ID, creates the project's folder (see "Where documents live"
      below), and registers it. Tell the user the new ID and that they'll
      need it to resume this project later (they might want to save it
-     somewhere) — the folder path alone won't help them resume, since
-     resuming works through the ID, not by remembering a path.
+     somewhere) — the folder path alone won't help them resume through the
+     ID lookup, since that's step 3's path, not this one.
    - **Existing project — user gives you an ID:** go to step 3.
-   - **User doesn't remember their ID:** run
+   - **Existing project — user gives you a path instead of an ID** (e.g.
+     they copied the folder from another machine, or don't have the ID
+     handy but know where the documents live): go to step 4.
+   - **User doesn't remember their ID or the path:** run
      `python scripts/pipeline_tool.py list-projects` and show them the
      list (name + ID + path) to jog their memory, rather than guessing
      which one they mean.
@@ -51,17 +55,37 @@ this:
    `python scripts/pipeline_tool.py resolve-project --project <id>`.
    - `EXISTING` → use it for the rest of this session.
    - `PROJECT_NOT_FOUND` → tell the user plainly that ID doesn't exist.
-     Ask whether they mistyped it (offer `list-projects`) or actually want
-     to start a new project. Don't silently fall back to minting a new ID
-     without asking — that would silently orphan whatever they thought
-     they were resuming.
+     Ask whether they mistyped it (offer `list-projects`), have a path
+     instead (go to step 4), or actually want to start a new project.
+     Don't silently fall back to minting a new ID without asking — that
+     would silently orphan whatever they thought they were resuming.
+4. **Adopt an existing folder by path**, when the user gives you a path
+   instead of (or after failing to confirm) an ID:
+   `python scripts/pipeline_tool.py resolve-project --path "<path>"`.
+   - `EXISTING` → that path is already registered; use the `project_id`
+     it returns.
+   - `ADOPTED` → the folder existed but wasn't registered (lost registry,
+     copied from another machine, etc.) and looks like it actually
+     contains pipeline documents. It's now registered under the returned
+     `project_id` — **tell the user this ID**, especially if
+     `id_inferred_from_folder_name` is `false` (meaning the ID couldn't be
+     read from the folder name and a fresh one was minted instead, so it
+     won't match anything they remember from before).
+   - `ADOPTED_EMPTY` → the folder was registered, but it doesn't contain
+     any recognizable pipeline structure (no `functional-requirements/`,
+     etc.). Flag this to the user rather than silently proceeding — it's
+     probably the wrong path, or a genuinely brand-new, empty folder they
+     pointed you at on purpose.
+   - `PATH_NOT_FOUND` → tell the user plainly and ask for a corrected path
+     or a project ID instead.
 
 Once you have a confirmed project ID, pass it as `--project <id>` on
-every subsequent `pipeline_tool.py` call in this session. A project ID
-being already present is exactly what tells you this is a returning
-project — check `plan` next to see what, if anything, needs to run to
-bring it up to date; don't assume the user wants everything regenerated
-just because they came back.
+every subsequent `pipeline_tool.py` call in this session — the path
+itself is only ever used at this resolution step, never passed to any
+other command. A project ID being already present is exactly what tells
+you this is a returning project — check `plan` next to see what, if
+anything, needs to run to bring it up to date; don't assume the user
+wants everything regenerated just because they came back.
 
 ## Why a script instead of doing this by hand
 
@@ -307,6 +331,45 @@ complete.
 before designing anything — if functional-requirements is on MVP 2 but
 non-functional-requirements is still on MVP 1, that's a sign NFR hasn't
 caught up yet, not something to design around by mixing scopes.
+
+## The backlog: where deferred items actually live
+
+A document's `deferred` array (in functional-requirements' and
+non-functional-requirements' `data.json`) is just a snapshot — what was
+deferred *as of that version*. The living, persistent list is a separate
+per-doc-type file, `<project-root>/<doc-type>/backlog.json`, managed
+through its own commands rather than being part of any document:
+
+```
+python scripts/pipeline_tool.py --project <id> backlog-add <doc-type> --text "..." --source skill|user
+python scripts/pipeline_tool.py --project <id> backlog-list <doc-type> [--all]
+python scripts/pipeline_tool.py --project <id> backlog-resolve <doc-type> --id BL-N --status included|dropped [--resulting-id FR-013]
+```
+
+Each item is `{"id": "BL-N", "text", "source", "status", "added_at"}`,
+optionally `"resulting_id"` once resolved. This isn't schema-validated
+like a document — it's tool-managed state, the same category as
+`LATEST.json`, not a pipeline document with its own contract.
+
+Two things this enables:
+
+1. **The skill suggests, the user decides.** When a round identifies more
+   good candidates than fit in this MVP, they go on the backlog via
+   `backlog-add ... --source skill` — and the skill surfaces them by name
+   during its human review checkpoint (not just a passing mention), so the
+   user can pull one into this round instead of leaving it for later.
+2. **The user can add to the backlog directly**, any time, without
+   triggering a full document regeneration: `backlog-add ... --source
+   user`. This is a lightweight operation — it doesn't touch any finalized
+   document or bump a version, so it doesn't need the human review
+   checkpoint that a real document revision does.
+
+When starting a new MVP round, a skill reads `backlog-list <doc-type>`
+*first*, before deriving anything new — the backlog is the starting
+candidate pool, not an afterthought. Items that make it into this round
+get `backlog-resolve ... --status included --resulting-id <the real ID>`;
+items that come up again but still don't fit stay pending; anything newly
+identified as out-of-scope this round gets added fresh.
 
 ## Conflict detection (architecture-design, but relevant to any skill that consumes multiple inputs)
 
