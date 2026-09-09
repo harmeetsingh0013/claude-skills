@@ -73,6 +73,13 @@ mismatch found here should still be reported, not silently resolved).
 | NFR | Related FR | Metric | Target | Priority |
 |-----|------------|--------|--------|----------|
 
+## MVP Scope
+
+MVP number (matches the FR document's MVP number this was derived from):
+New NFRs in this MVP:
+Total NFRs included so far:
+Is this the final MVP?
+
 ## Completeness Assessment
 
 Non-functional requirements status:

@@ -13,6 +13,13 @@ Version: 1.0
 Created: 2026-01-16
 Status: READY_FOR_ARCHITECTURE
 
+## MVP Scope
+
+MVP number: 1
+New NFRs in this MVP: 9
+Total NFRs included so far: 9
+Is this the final MVP? No
+
 ## Functional Requirements Input
 
 Input document: functional-requirements
@@ -63,6 +70,7 @@ READY_FOR_ARCHITECTURE
   "input_document": {"type": "functional-requirements", "version": "1.0", "validation": "PASS"},
   "status": "READY_FOR_ARCHITECTURE",
   "blocking_issues": [],
+  "mvp": {"number": 1, "new_in_this_mvp": 9, "total_included": 9, "is_final": false},
   "nfrs": [
     {
       "id": "NFR-001",
@@ -70,7 +78,8 @@ READY_FOR_ARCHITECTURE
       "related_fr": ["FR-004"],
       "metric": "Redirect p99 latency",
       "target": "< 100ms",
-      "priority": "P0"
+      "priority": "P0",
+      "mvp_number": 1
     },
     {
       "id": "NFR-002",
@@ -78,7 +87,8 @@ READY_FOR_ARCHITECTURE
       "related_fr": ["FR-005"],
       "metric": "Click event recording latency impact on redirect",
       "target": "Decoupled from redirect path",
-      "priority": "P0"
+      "priority": "P0",
+      "mvp_number": 1
     }
   ],
   "conflicts": [],

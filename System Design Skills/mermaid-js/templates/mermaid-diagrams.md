@@ -9,6 +9,7 @@ and is not separately versioned outside the directory.
 # Mermaid Diagram Artifacts
 
 Generated from: architecture-design v<version>
+MVP number:
 
 ## Diagrams
 

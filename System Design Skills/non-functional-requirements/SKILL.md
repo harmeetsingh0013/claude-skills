@@ -62,6 +62,32 @@ upstream (new/changed FRs, or a constraint the user just gave you) — don't
 regenerate attributes that are still accurate, and don't renumber existing
 NFR-N IDs.
 
+## Stay in lockstep with the FR document's MVP scope
+
+The FR document's `data.json` has an `mvp` object — read its `number`. You
+only derive NFRs for functional requirements carrying that **same**
+`mvp_number` in the FR document's `requirements` array (i.e., only the FRs
+that are new in this round) — FRs from earlier MVPs already have their
+NFRs from earlier runs of this skill, carried forward unchanged in your
+own baseline.
+
+This naturally keeps your batches small without needing a separate
+prioritization step: if the FR document added ~10 new requirements this
+round, you'll typically derive a similar order of new NFRs. Still, treat
+12 as a hard ceiling on `mvp.new_in_this_mvp` — `finalize` will reject a
+batch larger than that. If a single new FR implies more than a handful of
+NFRs on its own, that's fine; if the *total* new NFRs this round would
+exceed the ceiling, prioritize the most consequential ones (the ones that
+would most affect architecture-design's decisions) and defer the rest —
+note deferred ones in "NFR Open Questions" rather than silently dropping
+them.
+
+Set your own `mvp.number` to match the FR document's `mvp.number`. If
+you're only correcting an existing NFR (not deriving from newly-added
+FRs), keep the same `mvp.number` as your previous version. Set
+`mvp.is_final` to true only when the FR document's `mvp.is_final` is also
+true and you've derived NFRs for everything in it.
+
 ## How to derive NFRs from FRs
 
 For each functional requirement (read them from the FR `.data.json`'s
@@ -113,8 +139,9 @@ made-up one is a liability the architecture stage will silently build on.
 
 Fill in `templates/non-functional-requirements.md` exactly, including the
 "Functional Requirements Input" section (input document version + your
-`validate-data` result) near the top. See `examples/url-shortener-nfr.md`
-for a fully worked excerpt plus its matching `data.json`.
+`validate-data` result) and the "MVP Scope" section near the top. See
+`examples/url-shortener-nfr.md` for a fully worked excerpt plus its
+matching `data.json`.
 
 Alongside the `.md`, produce a `.data.json` following
 `schema/non-functional-requirements.schema.json` — this is the contract
@@ -140,7 +167,9 @@ Blocking issues:
 
 Set the same value in `data.json`'s `status` field
 (`READY_FOR_ARCHITECTURE` or `BLOCKED`), and list the same issues in
-`blocking_issues`.
+`blocking_issues`. As with functional-requirements, `READY_FOR_ARCHITECTURE`
+describes this MVP round, not full coverage — `mvp.is_final` answers that
+separately.
 
 ## Human review checkpoint — before writing anything to disk
 

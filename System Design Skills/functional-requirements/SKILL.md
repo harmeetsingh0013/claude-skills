@@ -54,7 +54,48 @@ revising the document, not starting fresh. Keep everything that's still
 true (including FR-N numbering — never renumber an existing requirement
 just because you're producing a new version); change only what the new or
 updated idea actually implies changed. Say what changed in your envelope's
-`summary`.
+`summary`. Also read the previous `data.json`'s `mvp` object — you need
+its `number` and `total_included` to work out this round's MVP number and
+where FR numbering continues from (see "Work in MVP-sized batches" below).
+
+## Work in MVP-sized batches
+
+Don't enumerate every functional requirement the idea implies in one
+shot. A large, fully-specified requirements set up front is harder for
+the user to review meaningfully, and it front-loads decisions (priority,
+scope) that are easier to make well in smaller batches with real feedback
+in between. Instead:
+
+1. **Think through the full scope first, privately** — identify everything
+   the idea implies, so your prioritization is informed by the whole
+   picture, not just whatever comes to mind first.
+2. **Select the ~10 most important requirements for this round** — the
+   ones that are foundational (other capabilities depend on them),
+   highest priority, or make up a coherent, shippable slice on their own.
+   Target 10; treat 12 as a hard ceiling — `finalize` will reject a batch
+   larger than that (`mvp.new_in_this_mvp` is schema-capped at 12), so if
+   you're tempted to go bigger, that's a sign to split into two rounds
+   instead.
+3. **List everything else as deferred**, by name only, in the "Deferred to
+   future MVPs" part of the MVP Scope section — this isn't wasted work,
+   it's what makes the next round's starting point clear to both you and
+   the user.
+4. **Number continuously across rounds.** If the previous version's `mvp`
+   object shows `total_included: 9`, this round's new requirements start
+   at FR-010, not FR-001 — figure out the highest existing FR-N from the
+   previous `data.json`'s `requirements` array.
+5. **Mark `is_final: true`** only when there's genuinely nothing left
+   worth deferring — i.e., this round's requirements plus everything
+   already included cover what the idea implies. Most first rounds should
+   be `is_final: false`.
+
+This applies to every run of this skill, not just the very first one —
+"starting a new MVP" and "revising functional-requirements" are the same
+operation here, just distinguished by whether you're adding a new batch
+(bump `mvp.number`) or correcting something already-approved (same
+`mvp.number` as before, since you're not adding new scope). If the user
+asks you to fix or reword an existing FR rather than add new ones, that's
+the latter case — don't bump the MVP number for a correction.
 
 ## Scope discipline
 
@@ -84,8 +125,10 @@ implied by the idea" rather than omitting a section). Each individual
 requirement gets its own `#### FR-NNN` block with every field the template
 lists (Name, Actor, Priority, Description, Preconditions, Trigger, Main
 Flow, Alternative Flows, Failure Behavior, Business Rules, Dependencies) —
-group requirements under `### <Capability>` headings. See
-`examples/url-shortener.md` for a fully worked document plus its matching
+group requirements under `### <Capability>` headings. Fill in the "MVP
+Scope" section per "Work in MVP-sized batches" above. See
+`examples/url-shortener.md` for a fully worked document (including an
+illustration of what a second MVP round looks like) plus its matching
 `data.json`.
 
 Alongside the `.md`, produce a `.data.json` following
@@ -128,6 +171,12 @@ Set the same value in `data.json`'s `status` field
 (`READY_FOR_NFR` or `BLOCKED`), and list the same issues in
 `blocking_issues`.
 
+Note that `READY_FOR_NFR` means *this MVP's slice is internally
+consistent and ready for the next stage* — it does not mean the whole
+product's requirements are fully captured. `mvp.is_final` is the separate
+field that answers that question; most rounds will be `READY_FOR_NFR` with
+`is_final: false`.
+
 ## Human review checkpoint — before writing anything to disk
 
 A product idea is rarely complete on its own — the user may have
@@ -137,14 +186,15 @@ because it's internally consistent.
 
 Draft the full document (and your intended Completeness Assessment)
 **directly in your response**, not to disk yet. Then explicitly ask
-something like: *"Here are the functional requirements I've drafted. Is
-there anything you'd like to add, remove, or change — any other
-capabilities, actors, or edge cases you had in mind? If this looks
-complete, I'll lock it in as v\<version\> and move on to non-functional
-requirements."* Then stop and wait for their reply in a new turn — don't
-write files or finalize in the same turn you present the draft, and don't
-treat an earlier "looks good, continue" from a different part of the
-conversation as approval for *this* draft.
+something like: *"Here are the top \<N\> functional requirements I'd
+prioritize for MVP \<number\> — FR-\<X\> through FR-\<Y\>. I've deferred
+\<list/count\> other capabilities to future MVPs (see below). Does this
+batch look right, any swaps or additions before I lock it in as
+v\<version\> and move on to non-functional requirements?"* Then stop and
+wait for their reply in a new turn — don't write files or finalize in the
+same turn you present the draft, and don't treat an earlier "looks good,
+continue" from a different part of the conversation as approval for *this*
+draft.
 
 If they ask for changes or add requirements, revise the draft and ask
 again. Repeat until the user explicitly confirms this version, or

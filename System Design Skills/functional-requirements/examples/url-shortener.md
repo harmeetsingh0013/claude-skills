@@ -236,6 +236,18 @@ implied.
 | FR-008 | Team Management | Team admin | P1 | Approved |
 | FR-009 | Team Management | Team admin | P1 | Approved |
 
+## MVP Scope
+
+MVP number: 1
+New requirements in this MVP: 9
+Total requirements included so far: 9
+Is this the final MVP? No
+
+Deferred to future MVPs:
+- Link expiration / TTL policies
+- Bulk link import
+- Custom domains for shortened links
+
 ## Completeness Assessment
 
 Functional requirements status:
@@ -256,6 +268,17 @@ markdown:
   "created": "2026-01-15",
   "status": "READY_FOR_NFR",
   "blocking_issues": [],
+  "mvp": {
+    "number": 1,
+    "new_in_this_mvp": 9,
+    "total_included": 9,
+    "is_final": false,
+    "deferred": [
+      "Link expiration / TTL policies",
+      "Bulk link import",
+      "Custom domains for shortened links"
+    ]
+  },
   "actors": ["Team member", "Team admin", "Link visitor"],
   "domain_entities": ["Team", "Member", "Link", "ClickEvent"],
   "requirements": [
@@ -267,6 +290,7 @@ markdown:
       "priority": "P0",
       "description": "The system must allow an authenticated team member to create a shortened URL from a long URL.",
       "status": "Approved",
+      "mvp_number": 1,
       "dependencies": []
     }
   ],
@@ -288,3 +312,28 @@ API Gateway, no analytics pipeline technology. Every requirement is an
 observable, independently testable capability. That discipline is what
 lets architecture-design make real decisions later instead of rubber-
 stamping choices this document already made.
+
+## What MVP 2 looks like
+
+Suppose the user approves MVP 1 (above), runs it through NFR/architecture/
+mermaid, and then asks for the next batch. `next-version` returns `1.0` as
+the previous version with this document as the baseline. The new version
+(`1.1`) is **cumulative, not a replacement**: FR-001 through FR-009 are
+carried forward unchanged, and up to ~10 new requirements are added
+starting at FR-010 (picking up numbering where MVP 1 left off — never
+renumbering existing IDs), drawn from the "Deferred to future MVPs" list
+above plus anything new the user has asked for since. Its MVP Scope
+section would read:
+
+```
+MVP number: 2
+New requirements in this MVP: 3
+Total requirements included so far: 12
+Is this the final MVP? Yes (this covers everything the idea implies)
+```
+
+and `data.json`'s `mvp` object would be
+`{"number": 2, "new_in_this_mvp": 3, "total_included": 12, "is_final": true, "deferred": []}`,
+with the three new requirement entries carrying `"mvp_number": 2` while
+FR-001 through FR-009 keep `"mvp_number": 1`.
+

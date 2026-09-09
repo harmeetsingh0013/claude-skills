@@ -2,7 +2,7 @@
   "$id": "functional-requirements.schema.json",
   "title": "Functional Requirements Document — data contract",
   "type": "object",
-  "required": ["document_id", "product", "version", "created", "status", "actors", "requirements", "traceability"],
+  "required": ["document_id", "product", "version", "created", "status", "mvp", "actors", "requirements", "traceability"],
   "properties": {
     "document_id": {"type": "string", "minLength": 1},
     "product": {"type": "string", "minLength": 1},
@@ -12,6 +12,20 @@
     "blocking_issues": {
       "type": "array",
       "items": {"type": "string"}
+    },
+    "mvp": {
+      "type": "object",
+      "required": ["number", "new_in_this_mvp", "total_included", "is_final"],
+      "properties": {
+        "number": {"type": "integer"},
+        "new_in_this_mvp": {"type": "integer", "minimum": 1, "maximum": 12},
+        "total_included": {"type": "integer"},
+        "is_final": {"type": "boolean"},
+        "deferred": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
     },
     "actors": {
       "type": "array",
@@ -25,9 +39,10 @@
     "requirements": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 40,
       "items": {
         "type": "object",
-        "required": ["id", "capability", "name", "actor", "priority", "description", "status"],
+        "required": ["id", "capability", "name", "actor", "priority", "description", "status", "mvp_number"],
         "properties": {
           "id": {"type": "string", "pattern": "^FR-[0-9]{3,}$"},
           "capability": {"type": "string", "minLength": 1},
@@ -36,6 +51,7 @@
           "priority": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
           "description": {"type": "string", "minLength": 1},
           "status": {"type": "string", "enum": ["Draft", "Approved", "Blocked"]},
+          "mvp_number": {"type": "integer"},
           "preconditions": {"type": "string"},
           "trigger": {"type": "string"},
           "main_flow": {"type": "string"},

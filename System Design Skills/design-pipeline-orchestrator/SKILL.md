@@ -1,6 +1,6 @@
 ---
 name: design-pipeline-orchestrator
-description: Coordinates the four-stage design pipeline (functional-requirements → non-functional-requirements → architecture-design → mermaid-js), deciding which stages need to run or re-run given a new or changed product idea, and enforcing that a stage never runs on stale or non-READY input. Use this whenever the user wants to run the whole pipeline end-to-end, wants to know pipeline status, gives a new product idea intending the full pipeline, or changes an upstream input (product idea, an FR, an NFR constraint) and wants downstream documents kept in sync. Use this INSTEAD of invoking an individual pipeline skill directly whenever more than one stage might be affected, or whenever it's unclear which stage(s) need to run. If the user asks specifically and only for one stage by name with no ambiguity about staleness, the individual skill (functional-requirements / non-functional-requirements / architecture-design / mermaid-js) can be used directly.
+description: Coordinates the four-stage design pipeline (functional-requirements → non-functional-requirements → architecture-design → mermaid-js), deciding which stages need to run or re-run, and enforcing that a stage never runs on stale or non-READY input. The pipeline works in MVP-sized iterations — each stage produces a small batch (~10 items) per round, not the whole product at once — and this skill tracks when an MVP is complete and offers to start the next. Use this to run the pipeline end-to-end, check status, start a new product, begin the next MVP, or propagate a changed input downstream. Prefer this over invoking an individual stage directly whenever more than one stage might be affected or it's unclear which should run; use a specific stage skill (functional-requirements / non-functional-requirements / architecture-design / mermaid-js) only when the user names exactly one with no staleness ambiguity.
 ---
 
 # Design Pipeline Orchestrator
@@ -83,6 +83,12 @@ project's subtree.
   that skill will read its own previous version (`.md` and `.data.json`) as
   a baseline and produce the next version itself. Only `set-idea`
   represents a change at the very top of the pipeline.
+- **The user wants to start the next MVP** (see Step 6) — this doesn't go
+  through `set-idea` either, since the underlying idea usually hasn't
+  changed. Invoke `functional-requirements` directly and let it pick the
+  next batch (it reads the previous MVP's `data.json` as baseline
+  regardless of whether `plan` would say `RUN` or `SKIP` — see the note in
+  Step 4).
 
 ## Step 4: Compute the plan
 
@@ -107,6 +113,16 @@ re-run the plan after FR completes, because their recorded input hash will
 then be stale relative to the new FR version. You don't need to manually
 figure out the downstream blast radius — just work through the plan in
 order and re-check it as you go (see Step 5).
+
+**`plan` only detects staleness from hash changes — it doesn't know about
+MVP progression.** If the user asks to start the next MVP and nothing
+about the underlying product idea changed, `plan` will report
+`functional-requirements` as `SKIP` (nothing's stale). That's correct as
+far as hash comparison goes, but it's not what you want here: starting the
+next MVP means deliberately invoking `functional-requirements` anyway,
+regardless of what `plan` says, and letting it read the previous round's
+`data.json` as baseline. Once it produces a new version, `plan` will
+correctly show the downstream stages as `RUN` from that point on.
 
 ## Step 5: Execute the plan, one stage at a time — and stop between every stage
 
@@ -157,7 +173,7 @@ per-stage check-in in Step 5.3 — but each stage's own content checkpoint
 still happens regardless, since that's about the content being correct,
 not about pacing.
 
-## Step 6: Report status
+## Step 6: Report status — and offer the next MVP if this one just finished
 
 After the run (whether it completed fully or stopped on an issue), give the
 user a short summary: the project ID (again, if newly minted), which
@@ -165,10 +181,34 @@ stages ran and to what version, which were skipped as up to date, and — if
 execution stopped early — exactly what's blocking and what input would
 unblock it.
 
+If `mermaid-diagrams` finished this run with `status: "READY"` (i.e. a
+full MVP cycle just completed end to end), check whether there's more
+work implied: read `is_final` from the latest `functional-requirements`
+`data.json` (all four stages should agree on this by the time mermaid
+finishes, since it's carried through — see each stage's own SKILL.md).
+
+- **`is_final: false`** — there's more scope deferred to future MVPs.
+  Tell the user what MVP just shipped and what's still deferred (the FR
+  document's `deferred` list), then ask something like: *"MVP \<N\> is
+  complete end-to-end. Want me to start MVP \<N+1\> with the next batch of
+  requirements, or are we done here for now?"* If they say yes, go back to
+  Step 3 with "the user wants the next MVP" as the recorded input, and run
+  the pipeline again from `functional-requirements`.
+- **`is_final: true`** — nothing's deferred; the product's full scope (as
+  currently understood) is built out. Say so plainly rather than asking
+  about a next MVP that doesn't exist yet.
+
+Don't ask about the next MVP after a partial run (a stage stopped on
+`BLOCKED_QUESTION`/`CONFLICT`/`ERROR`, or the user only asked for one
+specific stage) — that question only makes sense right after a complete,
+successful cycle.
+
 ## Answering "what's the pipeline status?" without changing anything
 
 If the user just wants to know where things stand, resolve the project ID
 per Step 1, then run `python scripts/pipeline_tool.py --project <id> plan`
 and `latest <doc_type>` for each stage, and report it — don't invoke any
-stage skill just to answer a status question. If the user asks what
-projects exist at all, `list-projects` answers that directly.
+stage skill just to answer a status question. Include the current MVP
+number and whether it's final (from `functional-requirements`'s latest
+`data.json`) as part of that status. If the user asks what projects exist
+at all, `list-projects` answers that directly.

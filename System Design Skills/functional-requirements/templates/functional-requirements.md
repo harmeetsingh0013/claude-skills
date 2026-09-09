@@ -72,6 +72,18 @@ Dependencies:
 | ID | Capability | Actor | Priority | Status |
 |----|------------|-------|----------|--------|
 
+## MVP Scope
+
+MVP number:
+New requirements in this MVP:
+Total requirements included so far (this + all previous MVPs):
+Is this the final MVP (i.e. does it cover everything the idea implies)?
+
+Deferred to future MVPs (name only, not full FR-detail — these aren't
+requirements yet, just a record of what's intentionally out of scope for
+now):
+- ...
+
 ## Completeness Assessment
 
 Functional requirements status:

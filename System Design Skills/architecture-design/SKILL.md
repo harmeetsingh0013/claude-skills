@@ -61,6 +61,20 @@ Record both `PASS`/`FAIL` results in Section 2 (Input Documents) of your
 document. A `FAIL` on either is a blocking condition — don't design against
 a structurally broken contract even if its status claimed READY.
 
+Then check that the two documents are talking about the **same MVP
+round**: compare `mvp.number` in the FR document's `data.json` against
+`mvp.number` in the NFR document's `data.json`.
+
+- **They match** → proceed normally.
+- **They don't match** (most commonly: FR is ahead, e.g. FR shows
+  `mvp.number: 2` but NFR still shows `mvp.number: 1`) → stop. Report:
+  `ERROR: Functional Requirements is at MVP <X> but Non-Functional
+  Requirements is still at MVP <Y> — run non-functional-requirements again
+  before architecture-design.` `check-ready` alone won't catch this,
+  because NFR's older version is still legitimately `READY` — it's just
+  stale relative to FR's newer MVP round, and designing against a
+  mismatched pair would silently mix scopes from two different rounds.
+
 ## Validate before designing: conflict detection
 
 Once both inputs pass validation, read them fully before writing anything,
@@ -101,6 +115,26 @@ affects — preserve ADRs and decisions that remain valid, and add a new ADR
 ADR-N`) if a decision needs to change. Note what changed and why in the
 envelope's `summary`.
 
+## Design only for the current MVP's scope
+
+Read the `mvp.number` from both the FR and NFR documents' `data.json` —
+they should match (the NFR document is built from that same FR round). Set
+your own `mvp.number` to the same value.
+
+Design for what's actually in scope now, not for requirements sitting in
+the FR document's "Deferred to future MVPs" list. It's tempting to
+future-proof — add the queue now because "we'll need it for MVP 3 anyway"
+— but that's speculative architecture based on requirements that haven't
+been approved yet and might change before they're actually scoped. If a
+past MVP's ADR already covers something the current MVP still needs,
+reuse it (that's normal and expected); just don't add new infrastructure
+or components in anticipation of work that isn't real yet. This is also
+what keeps this stage's output proportional to the FR/NFR batch size,
+rather than growing into a full system design on the first round.
+
+Set `mvp.is_final` to true only when both input documents' `mvp.is_final`
+are true.
+
 ## The reasoning chain: never skip straight to a technology
 
 Every consequential decision should visibly follow:
@@ -115,16 +149,17 @@ revisit intelligently when a requirement changes later.
 ## What belongs in this document
 
 Fill in `templates/architecture-design.md` exactly — it has 34 numbered
-sections plus a Completeness Assessment; don't drop or reorder them, even
-if a section ends up brief. Use `references/adr-format.md` for each ADR
-entry and `references/architecture-reasoning.md` for the driver chain. See
+sections plus an MVP Scope note and a Completeness Assessment; don't drop
+or reorder them, even if a section ends up brief. Use
+`references/adr-format.md` for each ADR entry and
+`references/architecture-reasoning.md` for the driver chain. See
 `examples/url-shortener-architecture.md` for a fully worked excerpt plus
 its matching `data.json`.
 
 Section 34 (Mermaid Diagram Specification) is where you tell `mermaid-js`
 what to produce: name, type, and what each diagram must show. List only
 the diagrams this specific design actually warrants — not one of every
-type by default.
+type by default, and not diagrams for deferred, not-yet-in-scope work.
 
 Alongside the `.md`, produce a `.data.json` following
 `schema/architecture-design.schema.json` — ADRs, components, diagram

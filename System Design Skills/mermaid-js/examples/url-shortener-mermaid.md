@@ -54,6 +54,7 @@ erDiagram
   "created": "2026-01-17",
   "input_document": {"type": "architecture-design", "version": "1.0", "validation": "PASS"},
   "status": "READY",
+  "mvp": {"number": 1, "is_final": false},
   "diagrams": [
     {
       "filename": "01-request-flow.mmd",

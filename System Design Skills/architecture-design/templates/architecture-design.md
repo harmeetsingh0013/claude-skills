@@ -103,6 +103,16 @@ sequence-diagram / deployment-architecture / entity-relationship /
 state-diagram), and what it must show. Only list diagrams the design
 actually warrants — not one of every type by default.
 
+## MVP Scope
+
+MVP number (matches the FR/NFR documents this design was derived from):
+Is this the final MVP?
+
+Design only for this MVP's FR/NFR scope — don't speculatively build
+infrastructure for deferred requirements that haven't been approved yet.
+Carry forward ADRs/components from earlier MVPs unchanged unless this
+MVP's new requirements actually affect them.
+
 ## Completeness Assessment
 
 Architecture status:

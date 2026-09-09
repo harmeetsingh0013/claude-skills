@@ -260,6 +260,54 @@ This returns `1.0` if no previous version exists, or `previous + 0.1`
 otherwise, along with the paths to the previous document, data file, and
 envelope so you can use them as a baseline. Never compute this yourself.
 
+## Working in MVP-sized batches
+
+The pipeline doesn't try to fully specify a product in one pass. Every
+content-producing document carries an `mvp` object in its `data.json`:
+
+```json
+"mvp": {
+  "number": 1,
+  "new_in_this_mvp": 9,
+  "total_included": 9,
+  "is_final": false,
+  "deferred": ["Bulk link import", "Custom domains"]
+}
+```
+
+(`new_in_this_mvp`/`total_included`/`deferred` apply to
+functional-requirements and non-functional-requirements, which hold a
+growing list of items; architecture-design and mermaid-diagrams carry only
+`number` and `is_final`, since they describe a design rather than a count
+of items.)
+
+**`mvp.number` is not the same thing as `version`.** `version` bumps on
+*every* approved change to a document, whether that change is "add the
+next batch of new scope" or just "fix the wording of an existing item."
+`mvp.number` only advances on the former — a wording fix to something
+already approved keeps the same `mvp.number` as before, even though it
+still gets a new `version`.
+
+**The ~10-item batch size is enforced, not just suggested.**
+`new_in_this_mvp` is schema-capped at 12 (functional-requirements) — a
+skill that tries to add more than that in one round has its `finalize`
+call rejected. This exists to catch a skill (or a large idea) dumping
+everything into one round; genuinely large scopes should be split across
+more MVPs, not one oversized one.
+
+**`is_final` propagates downstream.** functional-requirements decides it
+first (nothing meaningful left to defer); non-functional-requirements and
+architecture-design set their own `is_final` to true only once *all* their
+inputs also say `is_final: true`; mermaid-diagrams just carries whatever
+architecture-design said. This is what lets the orchestrator know, once a
+full cycle finishes, whether to offer another MVP or say the design is
+complete.
+
+**Architecture-design cross-checks `mvp.number` between its two inputs**
+before designing anything — if functional-requirements is on MVP 2 but
+non-functional-requirements is still on MVP 1, that's a sign NFR hasn't
+caught up yet, not something to design around by mixing scopes.
+
 ## Conflict detection (architecture-design, but relevant to any skill that consumes multiple inputs)
 
 If two required inputs make contradictory claims (e.g., an FR implying a

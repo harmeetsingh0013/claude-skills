@@ -49,6 +49,11 @@ narrative detail the structured entry doesn't fully capture. If a
 specification's `shows` is too vague to render faithfully, don't guess at
 structure — note it as a limitation instead (see Finishing).
 
+Read the architecture document's `mvp.number` too — set your own `mvp`
+object to match it. Since this stage only extracts what architecture
+already decided, there's no independent MVP judgment to make here; you're
+just carrying the label through.
+
 ## Baseline for incremental updates
 
 Run `python scripts/pipeline_tool.py --project <id> next-version mermaid-diagrams`.

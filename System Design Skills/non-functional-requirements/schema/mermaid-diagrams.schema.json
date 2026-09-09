@@ -2,7 +2,7 @@
   "$id": "mermaid-diagrams.schema.json",
   "title": "Mermaid Diagram Artifacts — data contract",
   "type": "object",
-  "required": ["document_id", "product", "version", "created", "input_document", "status", "diagrams"],
+  "required": ["document_id", "product", "version", "created", "input_document", "status", "mvp", "diagrams"],
   "properties": {
     "document_id": {"type": "string", "minLength": 1},
     "product": {"type": "string", "minLength": 1},
@@ -18,6 +18,14 @@
       }
     },
     "status": {"type": "string", "enum": ["READY", "BLOCKED"]},
+    "mvp": {
+      "type": "object",
+      "required": ["number", "is_final"],
+      "properties": {
+        "number": {"type": "integer"},
+        "is_final": {"type": "boolean"}
+      }
+    },
     "diagrams": {
       "type": "array",
       "items": {

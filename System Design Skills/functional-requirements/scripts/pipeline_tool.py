@@ -265,9 +265,10 @@ def hash_path(path: Path) -> str:
 
 # ------------------------------------------------------ minimal JSON Schema --
 # A dependency-free subset of JSON Schema: type, required, properties,
-# items, enum, pattern, minItems, minLength. This is intentionally not a
-# full implementation — it covers what the pipeline's own schemas use.
-# Don't reach for this to validate arbitrary third-party schemas.
+# items, enum, pattern, minItems, minLength, minimum, maximum. This is
+# intentionally not a full implementation — it covers what the pipeline's
+# own schemas use. Don't reach for this to validate arbitrary third-party
+# schemas.
 
 def _type_ok(value, expected):
     mapping = {
@@ -298,6 +299,12 @@ def validate_against_schema(data, schema, path="$"):
             errors.append(f"{path}: {data!r} does not match pattern {schema['pattern']!r}")
         if "minLength" in schema and len(data or "") < schema["minLength"]:
             errors.append(f"{path}: string shorter than minLength {schema['minLength']}")
+
+    if schema.get("type") in ("integer", "number"):
+        if "minimum" in schema and data < schema["minimum"]:
+            errors.append(f"{path}: {data!r} is less than minimum {schema['minimum']}")
+        if "maximum" in schema and data > schema["maximum"]:
+            errors.append(f"{path}: {data!r} exceeds maximum {schema['maximum']}")
 
     if schema.get("type") == "object":
         props = schema.get("properties", {})

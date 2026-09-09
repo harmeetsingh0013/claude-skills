@@ -57,6 +57,7 @@ no NFR requires real-time analytics.
     "non_functional_requirements": {"version": "1.0", "validation": "PASS"}
   },
   "status": "READY_FOR_MERMAID",
+  "mvp": {"number": 1, "is_final": false},
   "conflicts": [],
   "adrs": [
     {
