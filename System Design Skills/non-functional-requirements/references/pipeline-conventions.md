@@ -1,11 +1,17 @@
 # Design pipeline conventions
 
-These conventions are shared by all five pipeline skills: `functional-requirements`,
-`non-functional-requirements`, `architecture-design`, `mermaid-js`, and
-`design-pipeline-orchestrator`. Every skill uses the same `pipeline_tool.py`
-(a copy lives in each skill's `scripts/` folder) and the same four JSON
-Schemas (copies live in each content skill's `schema/` folder), so behavior
-is identical no matter which skill is invoked.
+These conventions are shared by all six pipeline skills: `mini-prd`,
+`functional-requirements`, `non-functional-requirements`,
+`architecture-design`, `mermaid-js`, and `design-pipeline-orchestrator`.
+Every skill uses the same `pipeline_tool.py` (a copy lives in each skill's
+`scripts/` folder) and the same five JSON Schemas (copies live in each
+content skill's `schema/` folder), so behavior is identical no matter
+which skill is invoked.
+
+The pipeline is: **mini-prd → functional-requirements →
+non-functional-requirements → architecture-design → mermaid-js**.
+mini-prd is the only stage with no upstream document to gate on — it
+starts from a raw problem/idea description instead.
 
 ## Every command needs a project ID — and it goes *before* the subcommand
 
@@ -158,11 +164,12 @@ Inside a project's folder, the layout is:
   product-idea/
     current.md
     LATEST.json            # {"version", "hash", "doc_path"}
-  functional-requirements/
+  mini-prd/
     v1.0.md
     v1.0.data.json
     v1.0.envelope.json
     LATEST.json            # {"version","status","doc_path","data_path","envelope_path","hash"}
+  functional-requirements/  (same shape)
   non-functional-requirements/   (same shape)
   architecture-design/           (same shape)
   mermaid-diagrams/
@@ -192,7 +199,7 @@ python scripts/pipeline_tool.py --project <id> finalize <path-to-envelope>
 
 `finalize` validates the envelope's required fields, validates the
 `data_path` file against that doc-type's schema (if both are present —
-which they should always be for the four content stages), computes the
+which they should always be for the five content stages), computes the
 document's hash, and updates `LATEST.json`. That's the *only* mechanism
 that makes a new version visible to downstream skills or the orchestrator
 — a document that exists on disk but was never finalized doesn't count.
@@ -207,7 +214,7 @@ that makes a new version visible to downstream skills or the orchestrator
   "document_path": "<project-root>/functional-requirements/v1.1.md",
   "data_path": "<project-root>/functional-requirements/v1.1.data.json",
   "inputs_consumed": {
-    "product-idea": {"version": "1.1", "hash": "sha256:..."}
+    "mini-prd": {"version": "1.1", "hash": "sha256:..."}
   },
   "next_skill": "non-functional-requirements",
   "summary": "One paragraph: what this version contains and, if it's a revision, what changed and why.",
@@ -249,7 +256,7 @@ Field notes:
 | `CONFLICT` (architecture-design only, from a Section 3 contradiction) | `CONFLICT` |
 | A run that failed before producing a real document at all (e.g. an unreadable input) | `ERROR` |
 
-## Reading inputs (every skill except functional-requirements)
+## Reading inputs (every skill except mini-prd)
 
 Before doing any generation work:
 
@@ -287,7 +294,11 @@ envelope so you can use them as a baseline. Never compute this yourself.
 ## Working in MVP-sized batches
 
 The pipeline doesn't try to fully specify a product in one pass. Every
-content-producing document carries an `mvp` object in its `data.json`:
+content-producing document **except mini-prd** carries an `mvp` object in
+its `data.json` (mini-prd's own "MVP Scope" section — In Scope / Out of
+Scope — is a single upfront product-level decision, not a batch-
+progression object; see mini-prd's own SKILL.md for why the two shouldn't
+be conflated):
 
 ```json
 "mvp": {

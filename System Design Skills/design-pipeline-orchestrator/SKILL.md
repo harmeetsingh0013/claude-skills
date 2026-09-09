@@ -1,14 +1,14 @@
 ---
 name: design-pipeline-orchestrator
-description: Coordinates the four-stage design pipeline (functional-requirements → non-functional-requirements → architecture-design → mermaid-js), deciding which stages need to run or re-run, and enforcing that a stage never runs on stale or non-READY input. The pipeline works in MVP-sized iterations — each stage produces a small batch (~10 items) per round, not the whole product at once — and this skill tracks when an MVP is complete and offers to start the next. Use this to run the pipeline end-to-end, check status, start a new product, begin the next MVP, or propagate a changed input downstream. Prefer this over invoking an individual stage directly whenever more than one stage might be affected or it's unclear which should run; use a specific stage skill (functional-requirements / non-functional-requirements / architecture-design / mermaid-js) only when the user names exactly one with no staleness ambiguity.
+description: Coordinates the five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js), deciding which stages need to run or re-run, and enforcing that a stage never runs on stale or non-READY input. The pipeline works in MVP-sized iterations — each requirements stage produces a small batch (~10 items) per round, not the whole product at once — and this skill tracks when an MVP is complete and offers to start the next. Use this to run the pipeline end-to-end, check status, start a new product, begin the next MVP, or propagate a changed input downstream. Prefer this over invoking an individual stage directly whenever more than one stage might be affected or it's unclear which should run; use a specific stage skill (mini-prd / functional-requirements / non-functional-requirements / architecture-design / mermaid-js) only when the user names exactly one with no staleness ambiguity.
 ---
 
 # Design Pipeline Orchestrator
 
 You decide *which* pipeline skills need to run and in *what order* — you do
-not write requirements, architecture, or diagrams yourself. Each stage's
-actual content is produced by following that stage's own skill
-(`functional-requirements`, `non-functional-requirements`,
+not write the PRD, requirements, architecture, or diagrams yourself. Each
+stage's actual content is produced by following that stage's own skill
+(`mini-prd`, `functional-requirements`, `non-functional-requirements`,
 `architecture-design`, `mermaid-js`), which you should treat as available
 sub-skills to consult, the same way you'd consult any other skill. Read
 `references/pipeline-conventions.md` once at the start of a session if you
@@ -93,19 +93,23 @@ project's subtree.
 
 ## Step 3: Record any new/changed input
 
-- New or updated product idea: `echo "<idea>" | python scripts/pipeline_tool.py --project <id> set-idea`
-- A change the user describes as an edit to an existing FR or NFR document
-  (not a fresh idea) doesn't go through `set-idea` — instead, invoke the
-  relevant stage's skill directly with the user's requested change in mind;
-  that skill will read its own previous version (`.md` and `.data.json`) as
-  a baseline and produce the next version itself. Only `set-idea`
-  represents a change at the very top of the pipeline.
+- **New product, or a new problem/idea description:** `echo "<description>" | python scripts/pipeline_tool.py --project <id> set-idea`.
+  This is mini-prd's input, not functional-requirements' — the pipeline
+  now starts with an interview (mini-prd), not straight into requirements.
+  A short, even one-line description is fine here; the mini-prd skill's
+  interview is what turns it into something usable.
+- A change the user describes as an edit to an existing Mini-PRD, FR, or
+  NFR document (not a fresh problem description) doesn't go through
+  `set-idea` — instead, invoke the relevant stage's skill directly with
+  the user's requested change in mind; that skill will read its own
+  previous version (`.md` and `.data.json`) as a baseline and produce the
+  next version itself. Only `set-idea` represents a change at the very
+  top of the pipeline.
 - **The user wants to start the next MVP** (see Step 6) — this doesn't go
-  through `set-idea` either, since the underlying idea usually hasn't
-  changed. Invoke `functional-requirements` directly and let it pick the
-  next batch (it reads the previous MVP's `data.json` as baseline
-  regardless of whether `plan` would say `RUN` or `SKIP` — see the note in
-  Step 4).
+  through `set-idea` either, since the Mini-PRD usually hasn't changed.
+  Invoke `functional-requirements` directly and let it pick the next
+  batch (it reads the previous MVP's `data.json` as baseline regardless
+  of whether `plan` would say `RUN` or `SKIP` — see the note in Step 4).
 
 ## Step 4: Compute the plan
 
@@ -113,7 +117,7 @@ project's subtree.
 python scripts/pipeline_tool.py --project <id> plan
 ```
 
-This walks all four stages in order and reports, per stage, one of:
+This walks all five stages in order and reports, per stage, one of:
 
 - `RUN` — this stage's recorded inputs no longer match its required
   inputs' current versions (or it has never been run, or its current
@@ -124,12 +128,12 @@ This walks all four stages in order and reports, per stage, one of:
   invoke this stage; work through the stages it's waiting on first (they
   should appear earlier in the plan).
 
-The plan already accounts for cascading: if `functional-requirements`
-needs to run, everything downstream of it will show `RUN` too once you
-re-run the plan after FR completes, because their recorded input hash will
-then be stale relative to the new FR version. You don't need to manually
-figure out the downstream blast radius — just work through the plan in
-order and re-check it as you go (see Step 5).
+The plan already accounts for cascading: if `mini-prd` needs to run,
+everything downstream of it will show `RUN` too once you re-run the plan
+after it completes, because their recorded input hash will then be stale
+relative to the new version. You don't need to manually figure out the
+downstream blast radius — just work through the plan in order and
+re-check it as you go (see Step 5).
 
 **`plan` only detects staleness from hash changes — it doesn't know about
 MVP progression.** If the user asks to start the next MVP and nothing
@@ -143,8 +147,8 @@ correctly show the downstream stages as `RUN` from that point on.
 
 ## Step 5: Execute the plan, one stage at a time — and stop between every stage
 
-For each stage marked `RUN`, in the order the plan lists them
-(functional-requirements, then non-functional-requirements, then
+For each stage marked `RUN`, in the order the plan lists them (mini-prd,
+then functional-requirements, then non-functional-requirements, then
 architecture-design, then mermaid-js):
 
 1. Invoke that stage by following its own SKILL.md instructions, passing
@@ -161,12 +165,12 @@ architecture-design, then mermaid-js):
 3. Once the stage finalizes (`status: "READY"`), **stop and check in with
    the user before invoking the next stage**, even though its own
    checkpoint already got their sign-off on the content. Something like:
-   *"Functional requirements are locked at v1.0. Ready for me to continue
-   with non-functional requirements, or would you like to pause here?"*
-   Wait for their answer before invoking the next stage — don't chain
-   straight through the whole plan in one uninterrupted sequence. This
-   gives the user control over pacing, not just content, and a natural
-   place to stop if they want to think something over.
+   *"The Mini-PRD is locked at v1.0. Ready for me to continue with
+   functional requirements, or would you like to pause here?"* Wait for
+   their answer before invoking the next stage — don't chain straight
+   through the whole plan in one uninterrupted sequence. This gives the
+   user control over pacing, not just content, and a natural place to stop
+   if they want to think something over.
 4. Re-run `python scripts/pipeline_tool.py --project <id> plan` before
    moving to the next stage — don't assume the plan you computed at the
    start is still accurate, since a stage's own output determines whether
@@ -201,8 +205,10 @@ unblock it.
 If `mermaid-diagrams` finished this run with `status: "READY"` (i.e. a
 full MVP cycle just completed end to end), check whether there's more
 work implied: read `is_final` from the latest `functional-requirements`
-`data.json` (all four stages should agree on this by the time mermaid
-finishes, since it's carried through — see each stage's own SKILL.md).
+`data.json` (every stage from functional-requirements onward should agree
+on this by the time mermaid finishes, since it's carried through — see
+each stage's own SKILL.md; mini-prd itself doesn't carry an `mvp` object —
+see "Working in MVP-sized batches" in `references/pipeline-conventions.md`).
 
 - **`is_final: false`** — there's more scope deferred to future MVPs.
   Check the backlog for a fuller picture than the FR document's `deferred`

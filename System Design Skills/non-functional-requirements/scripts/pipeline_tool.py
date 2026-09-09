@@ -27,6 +27,7 @@ project lives directly under that one project folder:
 
     <home-or-C:\\>/url-shortener-curious-mango/
       product-idea/
+      mini-prd/
       functional-requirements/
       non-functional-requirements/
       architecture-design/
@@ -70,11 +71,12 @@ Directory layout this script maintains (within one project's folder):
       product-idea/
         current.md
         LATEST.json           <- {"version", "hash", "doc_path"}
-      functional-requirements/
+      mini-prd/
         v1.0.md
         v1.0.data.json
         v1.0.envelope.json
         LATEST.json           <- {"version","status","doc_path","data_path","envelope_path","hash"}
+      functional-requirements/  (same shape)
       non-functional-requirements/  (same shape)
       architecture-design/          (same shape)
       mermaid-diagrams/
@@ -134,8 +136,13 @@ SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schema"
 ROOT = None
 
 PIPELINE = {
-    "functional-requirements": {
+    "mini-prd": {
         "inputs": ["product-idea"],
+        "next": "functional-requirements",
+        "skill": "mini-prd",
+    },
+    "functional-requirements": {
+        "inputs": ["mini-prd"],
         "next": "non-functional-requirements",
         "skill": "functional-requirements",
     },
@@ -726,7 +733,7 @@ def cmd_needs_rerun(args):
 
 def cmd_plan(args):
     """Walk the DAG in order and report which doc_types need a rerun, cascading."""
-    order = ["functional-requirements", "non-functional-requirements",
+    order = ["mini-prd", "functional-requirements", "non-functional-requirements",
              "architecture-design", "mermaid-diagrams"]
     plan = []
     for doc_type in order:

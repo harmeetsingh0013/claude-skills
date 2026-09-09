@@ -58,3 +58,26 @@ stateDiagram-v2
     Ready --> [*]
     Failed --> [*]
 ```
+
+## Context map (approximated as a labeled flowchart)
+
+Mermaid has no dedicated diagram type for DDD context maps — render it as
+a flowchart with each bounded context as a node and each relationship as
+a labeled edge carrying the pattern name from architecture-design's
+Context Map section (Partnership, Shared Kernel, Customer-Supplier,
+Conformist, Anticorruption Layer, Open Host Service, Published Language,
+Separate Ways):
+
+```mermaid
+flowchart LR
+    BC01["BC-01: Link Management"]
+    BC02["BC-02: Analytics"]
+    BC03["BC-03: Team & Access"]
+    BC03 -->|Customer-Supplier| BC01
+    BC01 -->|"Published Language (LinkClicked)"| BC02
+```
+
+Keep edge labels short — the pattern name plus, in parentheses, the
+concrete mechanism (a domain event name, a shared table, etc.) if there's
+room. Don't try to show aggregates or tactical detail on this diagram;
+that's what an entity-relationship diagram is for.

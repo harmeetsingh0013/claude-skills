@@ -37,7 +37,7 @@
             "type": "string",
             "enum": ["system-context", "container-architecture", "request-flow",
                      "data-flow", "sequence-diagram", "deployment-architecture",
-                     "entity-relationship", "state-diagram"]
+                     "entity-relationship", "state-diagram", "context-map"]
           },
           "shows": {"type": "string", "minLength": 1},
           "source": {"type": "string", "enum": ["mcp", "native"]},

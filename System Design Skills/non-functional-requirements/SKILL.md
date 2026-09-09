@@ -1,6 +1,6 @@
 ---
 name: non-functional-requirements
-description: Produces a versioned Non-Functional Requirements Document (with a machine-readable data contract covering performance, scalability, availability, security, and other quality attributes) from a Functional Requirements Document, as stage 2 of a four-stage design pipeline (functional-requirements → non-functional-requirements → architecture-design → mermaid-js). Use this when the user wants to define quality attributes, constraints, SLAs, throughput/latency targets, or non-functional requirements for a product that already has (or should have) a functional requirements document, or explicitly asks to run/update the "non-functional requirements" / "NFR" stage. Also use it when re-invoked by the design-pipeline-orchestrator skill. Do not use this to make architecture or technology decisions (e.g. "use S3", "use Postgres") — those belong to architecture-design.
+description: Produces a versioned Non-Functional Requirements Document (with a machine-readable data contract covering performance, scalability, availability, security, and other quality attributes) from a Functional Requirements Document, as stage 2 of a five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js). Use this when the user wants to define quality attributes, constraints, SLAs, throughput/latency targets, or non-functional requirements for a product that already has (or should have) a functional requirements document, or explicitly asks to run/update the "non-functional requirements" / "NFR" stage. Also use it when re-invoked by the design-pipeline-orchestrator skill. Do not use this to make architecture or technology decisions (e.g. "use S3", "use Postgres") — those belong to architecture-design.
 ---
 
 # Non-Functional Requirements
@@ -120,6 +120,22 @@ include what's actually relevant to this product's FRs. Every NFR you
 write should record which FR-N(s) motivated it (the template's `Related
 FR` field, and `data.json`'s `related_fr` array) — an NFR with no traceable
 FR is a sign you've invented a requirement rather than derived one.
+
+## Use the Mini-PRD's workload assumptions where you have them
+
+Before inventing a capacity number from scratch, check whether the
+project has a Mini-PRD with real numbers already: `python scripts/pipeline_tool.py --project <id> latest mini-prd`.
+This is *informative context, not a required gate* — unlike
+functional-requirements, don't fail or block if it's missing (an older
+project might not have one, or the user might be running this skill
+standalone). When it exists, its `assumptions.workload` array (e.g. "up
+to 100 million new links/month," "redirect traffic substantially greater
+than creation traffic") is exactly what section 9 of the Mini-PRD template
+means when it says workload assumptions "can later be converted into
+measurable NFRs" — turn them into concrete throughput/scale targets here
+rather than re-deriving or re-guessing them. If a workload assumption and
+an FR-implied need seem to conflict, don't silently pick one — note it in
+"NFR Open Questions."
 
 ## Scope discipline
 

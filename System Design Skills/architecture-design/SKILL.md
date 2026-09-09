@@ -1,17 +1,28 @@
 ---
 name: architecture-design
-description: Produces a versioned, complete system-design/architecture document (with a machine-readable data contract covering components, data architecture, APIs, ADRs, security, scalability, resilience, observability, trade-offs, and Mermaid diagram specifications) from a Functional Requirements Document and a Non-Functional Requirements Document, as stage 3 of a four-stage design pipeline (functional-requirements → non-functional-requirements → architecture-design → mermaid-js). Use this when the user wants system architecture, technical design, a design doc, ADRs, or technology/component decisions for a product that has (or should have) FR and NFR documents, or explicitly asks to run/update the "architecture design" stage. Also use it when re-invoked by the design-pipeline-orchestrator skill. This is the one skill in the pipeline that makes technology and implementation decisions — the other requirements skills deliberately don't.
+description: Produces a versioned system-design/architecture document using a Domain-Driven Design approach — ubiquitous language, bounded contexts, context mapping, and tactical design (aggregates, entities, domain events) — plus components, data architecture, APIs, ADRs, security, scalability, resilience, a module/task breakdown map, and Mermaid diagram specifications. Stage 3 of a five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js), built from FR and NFR documents. Use for system architecture, technical design, ADRs, domain modeling, bounded contexts, or technology/component decisions for a product with FR/NFR documents, or to run/update the "architecture design" stage. Also use when re-invoked by design-pipeline-orchestrator. The one pipeline stage that makes technology and domain-modeling decisions — but never produces implementation code itself.
 ---
 
 # Architecture Design
 
-You own turning validated requirements into a complete, decided system
-design. This is the only pipeline stage where naming a database, a queue,
-a cloud service, or an API shape is correct rather than scope creep — but
-every decision here should trace back to something in the FR or NFR
-document, not to habit or default preference. Read
-`references/pipeline-conventions.md` once at the start of a session if you
-haven't already.
+You approach this the way Eric Evans' *Domain-Driven Design* does: start
+from the domain (what the FR/NFR documents actually describe), find its
+natural seams (bounded contexts), give each a precise shared vocabulary
+(ubiquitous language), and only then get concrete about aggregates,
+technology, and components — never the other way around. This is the only
+pipeline stage where naming a database, a queue, a cloud service, or an
+API shape is correct rather than scope creep — but every decision here
+should trace back to something in the FR or NFR document, not to habit or
+default preference. Read `references/pipeline-conventions.md` once at the
+start of a session if you haven't already.
+
+**You design; you don't implement.** Bounded contexts, aggregates, domain
+events, and components are described in prose and structured data —
+never as class definitions, method signatures, interface code, or
+database DDL. The output of this skill is meant to become the input to a
+future implementation task-breakdown (see the Module & Task Breakdown Map
+below); writing the implementation yourself would pre-empt that step, not
+help it.
 
 ## Step 1: Get the project ID
 
@@ -61,6 +72,16 @@ python scripts/pipeline_tool.py --project <id> validate-data non-functional-requ
 Record both `PASS`/`FAIL` results in Section 2 (Input Documents) of your
 document. A `FAIL` on either is a blocking condition — don't design against
 a structurally broken contract even if its status claimed READY.
+
+Also check for a Mini-PRD, informatively (not a required gate — the two
+checks above are the only hard requirements): `python scripts/pipeline_tool.py --project <id> latest mini-prd`.
+Its Section 10 (Constraints) is a legitimate source of architecture
+drivers that would never otherwise surface in FR (behavioral) or NFR
+(quality-attribute) documents — a regulatory constraint, a mandate to use
+existing infrastructure, a real budget ceiling. If it exists, read its
+constraints and let genuine ones inform an ADR the normal way (see "The
+reasoning chain" below); if it doesn't exist (an older project, or this
+skill run standalone), proceed without it.
 
 Then check that the two documents are talking about the **same MVP
 round**: compare `mvp.number` in the FR document's `data.json` against
@@ -136,6 +157,54 @@ rather than growing into a full system design on the first round.
 Set `mvp.is_final` to true only when both input documents' `mvp.is_final`
 are true.
 
+## Domain-Driven Design approach
+
+Do strategic design before tactical design, and tactical design before
+technology decisions — in that order, every time. See
+`references/ddd-glossary.md` for full definitions of every term below and
+the heuristics for finding boundaries.
+
+**1. Ubiquitous Language.** Pull the vocabulary the FR/NFR documents
+already use — don't invent new names for things they named. If a term
+means different things in different areas (the same word "Team" used for
+two different concepts, say), that's an early signal you're looking at
+more than one bounded context.
+
+**2. Bounded Contexts (strategic design).** Partition the system using
+the FR document's capability groupings, differing NFR profiles (a
+strict-consistency/low-latency area vs. an eventually-consistent one is a
+strong hint), vocabulary splits, and natural ownership boundaries. Every
+bounded context you name here **is a module** — this is the structure a
+future implementation task-breakdown will work from, so favor a small
+number of clearly-scoped contexts over many overlapping ones.
+
+**3. Context Map (strategic design).** For every pair of bounded contexts
+that interact, name the relationship using one of the DDD context-mapping
+patterns (Partnership, Shared Kernel, Customer-Supplier, Conformist,
+Anticorruption Layer, Open Host Service, Published Language, Separate
+Ways) with a stated rationale. Don't leave a relationship unlabeled, and
+don't invent a pattern name that isn't one of these.
+
+**4. Tactical Design.** Within each bounded context, name its aggregates
+(aggregate root, entities, value objects, invariants) and its domain
+events. An aggregate's boundary is also its transactional consistency
+boundary — this is where an NFR's consistency/concurrency requirement
+becomes concrete. Cross-aggregate and cross-context consistency is
+eventual, coordinated through the domain events you name here — which is
+usually also the mechanism behind a Published Language or Open Host
+Service relationship in the context map.
+
+**5. Only then, technology and component decisions** — see "The reasoning
+chain" below, which now operates *within* the bounded contexts and
+aggregates you've just defined rather than against the raw FR/NFR list.
+
+Bounded contexts should be genuinely stable across MVPs (see "Design only
+for the current MVP's scope" above) — most rounds add aggregates or
+tactical detail to an existing context, not new contexts. If you find
+yourself redrawing context boundaries every round, that's usually a sign
+the boundaries weren't right the first time, not that the product
+genuinely changed shape.
+
 ## The reasoning chain: never skip straight to a technology
 
 Every consequential decision should visibly follow:
@@ -149,23 +218,35 @@ revisit intelligently when a requirement changes later.
 
 ## What belongs in this document
 
-Fill in `templates/architecture-design.md` exactly — it has 34 numbered
+Fill in `templates/architecture-design.md` exactly — it has 36 numbered
 sections plus an MVP Scope note and a Completeness Assessment; don't drop
 or reorder them, even if a section ends up brief. Use
-`references/adr-format.md` for each ADR entry and
+`references/ddd-glossary.md` for DDD terminology and patterns,
+`references/adr-format.md` for each ADR entry, and
 `references/architecture-reasoning.md` for the driver chain. See
-`examples/url-shortener-architecture.md` for a fully worked excerpt plus
-its matching `data.json`.
+`examples/url-shortener-architecture.md` for a fully worked excerpt
+(including the DDD sections and the Module & Task Breakdown Map) plus its
+matching `data.json`.
 
-Section 34 (Mermaid Diagram Specification) is where you tell `mermaid-js`
+Section 35 (Module & Task Breakdown Map) is the explicit forward-looking
+deliverable: one row per bounded context, its dependencies on other
+bounded contexts, and a coarse category list of what a future
+implementation effort would need to do — not actual tickets or code, just
+clean boundaries and dependency order for a future task-breakdown step to
+work from.
+
+Section 36 (Mermaid Diagram Specification) is where you tell `mermaid-js`
 what to produce: name, type, and what each diagram must show. List only
 the diagrams this specific design actually warrants — not one of every
-type by default, and not diagrams for deferred, not-yet-in-scope work.
+type by default, and not diagrams for deferred, not-yet-in-scope work. A
+`context-map` diagram is usually worth including once you have more than
+one bounded context.
 
 Alongside the `.md`, produce a `.data.json` following
-`schema/architecture-design.schema.json` — ADRs, components, diagram
-specifications, and traceability all need structured entries, not just
-prose. This is the contract `mermaid-js` will read.
+`schema/architecture-design.schema.json` — ubiquitous language, bounded
+contexts, the context map, domain events, ADRs, components, the module
+breakdown, diagram specifications, and traceability all need structured
+entries, not just prose. This is the contract `mermaid-js` will read.
 
 ## No hallucination
 
@@ -209,27 +290,36 @@ Set the same value in `data.json`'s `status` field
 ## Human review checkpoint — before writing anything to disk
 
 This is the stage with the most consequential decisions in the whole
-pipeline — technology choices are expensive to unwind later, and the user
-may have constraints (a preferred cloud provider, an existing system to
-integrate with, a team's existing expertise) that never showed up in the
-FR or NFR documents because nothing asked about them there.
+pipeline — bounded context boundaries and technology choices are both
+expensive to unwind later, and the user may have constraints (a preferred
+cloud provider, an existing system to integrate with, a team's existing
+expertise, or a different sense of where the domain's natural seams are)
+that never showed up in the FR or NFR documents because nothing asked
+about them there.
 
 Draft the full document **directly in your response**, not to disk yet.
-At minimum, walk through the key decisions and ADRs, not just a "done!" —
-the user needs enough to actually evaluate it. Then explicitly ask
-something like: *"Here's the architecture design, including the key
-decisions in ADR-1 through ADR-N. Do these technology choices work for
-you — any constraints I should account for, or anything you'd change
-before I lock this in as v\<version\> and hand off to diagram generation?"*
-Stop and wait for their reply in a new turn — don't write files or
-finalize in the same turn you present the draft.
+At minimum, walk through the bounded contexts and context map (the
+strategic design — this is often the more consequential thing to get
+right, and the easiest to fix early), then the key ADRs, not just a
+"done!" — the user needs enough to actually evaluate it. Then explicitly
+ask something like: *"Here's the architecture design: I've split this
+into \<N\> bounded contexts — \<names\> — connected as \<brief context map
+summary\>. Does that domain split make sense, or would you carve it up
+differently? And here are the key technology decisions in ADR-1 through
+ADR-N — do these work for you, or any constraints I should account for,
+before I lock this in as v\<version\> and hand off to diagram
+generation?"* Stop and wait for their reply in a new turn — don't write
+files or finalize in the same turn you present the draft.
 
-If they push back on a decision, treat that the same way you'd treat a new
-constraint: revise the relevant ADR (superseding it, not silently editing
-it, per `references/adr-format.md`) and ask again. Repeat until the user
-explicitly confirms this version, or explicitly tells you to proceed
-without further review. This applies even when the orchestrator invoked
-you.
+If they push back on a bounded context boundary, that's a strategic-design
+change — revise sections 4-6 (and everything downstream that references
+them) before moving on, rather than patching around it in the tactical or
+technology sections. If they push back on a technology decision, treat
+that the same way you'd treat a new constraint: revise the relevant ADR
+(superseding it, not silently editing it, per `references/adr-format.md`)
+and ask again. Repeat until the user explicitly confirms this version, or
+explicitly tells you to proceed without further review. This applies even
+when the orchestrator invoked you.
 
 If your Completeness Assessment is `CONFLICT`, present the conflict report
 itself for this checkpoint — the question becomes "which side should

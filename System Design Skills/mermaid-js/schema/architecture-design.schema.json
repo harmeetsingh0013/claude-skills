@@ -2,7 +2,7 @@
   "$id": "architecture-design.schema.json",
   "title": "System Architecture & Design Document — data contract",
   "type": "object",
-  "required": ["document_id", "product", "version", "created", "input_documents", "status", "mvp", "adrs", "components", "diagram_specifications", "traceability"],
+  "required": ["document_id", "product", "version", "created", "input_documents", "status", "mvp", "ubiquitous_language", "bounded_contexts", "context_map", "domain_events", "adrs", "components", "module_breakdown", "diagram_specifications", "traceability"],
   "properties": {
     "document_id": {"type": "string", "minLength": 1},
     "product": {"type": "string", "minLength": 1},
@@ -50,6 +50,72 @@
         }
       }
     },
+    "ubiquitous_language": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["term", "definition"],
+        "properties": {
+          "term": {"type": "string", "minLength": 1},
+          "definition": {"type": "string", "minLength": 1},
+          "bounded_context": {"type": "string"}
+        }
+      }
+    },
+    "bounded_contexts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "responsibility", "aggregates", "related_requirements"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^BC-[0-9]{2,}$"},
+          "name": {"type": "string", "minLength": 1},
+          "responsibility": {"type": "string", "minLength": 1},
+          "aggregates": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "related_requirements": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "context_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "relationship"],
+        "properties": {
+          "from": {"type": "string", "pattern": "^BC-[0-9]{2,}$"},
+          "to": {"type": "string", "pattern": "^BC-[0-9]{2,}$"},
+          "relationship": {
+            "type": "string",
+            "enum": ["Partnership", "Shared Kernel", "Customer-Supplier",
+                     "Conformist", "Anticorruption Layer", "Open Host Service",
+                     "Published Language", "Separate Ways"]
+          },
+          "rationale": {"type": "string"}
+        }
+      }
+    },
+    "domain_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "bounded_context"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "bounded_context": {"type": "string", "pattern": "^BC-[0-9]{2,}$"},
+          "consumed_by": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
     "adrs": {
       "type": "array",
       "items": {
@@ -74,7 +140,27 @@
         "required": ["name", "responsibility"],
         "properties": {
           "name": {"type": "string", "minLength": 1},
-          "responsibility": {"type": "string", "minLength": 1}
+          "responsibility": {"type": "string", "minLength": 1},
+          "bounded_context": {"type": "string"}
+        }
+      }
+    },
+    "module_breakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["module_id", "depends_on"],
+        "properties": {
+          "module_id": {"type": "string", "pattern": "^BC-[0-9]{2,}$"},
+          "depends_on": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "suggested_task_granularity": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "mvp_alignment": {"type": "integer"}
         }
       }
     },
@@ -89,7 +175,7 @@
             "type": "string",
             "enum": ["system-context", "container-architecture", "request-flow",
                      "data-flow", "sequence-diagram", "deployment-architecture",
-                     "entity-relationship", "state-diagram"]
+                     "entity-relationship", "state-diagram", "context-map"]
           },
           "shows": {"type": "string", "minLength": 1}
         }

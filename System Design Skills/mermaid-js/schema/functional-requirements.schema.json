@@ -2,12 +2,21 @@
   "$id": "functional-requirements.schema.json",
   "title": "Functional Requirements Document — data contract",
   "type": "object",
-  "required": ["document_id", "product", "version", "created", "status", "mvp", "actors", "requirements", "traceability"],
+  "required": ["document_id", "product", "version", "created", "input_document", "status", "mvp", "actors", "requirements", "traceability"],
   "properties": {
     "document_id": {"type": "string", "minLength": 1},
     "product": {"type": "string", "minLength": 1},
     "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
     "created": {"type": "string", "minLength": 1},
+    "input_document": {
+      "type": "object",
+      "required": ["type", "version", "validation"],
+      "properties": {
+        "type": {"type": "string", "enum": ["mini-prd"]},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+        "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+      }
+    },
     "status": {"type": "string", "enum": ["READY_FOR_NFR", "BLOCKED"]},
     "blocking_issues": {
       "type": "array",
@@ -52,6 +61,7 @@
           "description": {"type": "string", "minLength": 1},
           "status": {"type": "string", "enum": ["Draft", "Approved", "Blocked"]},
           "mvp_number": {"type": "integer"},
+          "source_pr": {"type": "string", "pattern": "^PR-[0-9]{3,}$"},
           "preconditions": {"type": "string"},
           "trigger": {"type": "string"},
           "main_flow": {"type": "string"},

@@ -1,0 +1,141 @@
+{
+  "$id": "mini-prd.schema.json",
+  "title": "Mini-PRD — data contract",
+  "type": "object",
+  "required": ["document_id", "product", "version", "created", "status",
+               "problem_statement", "actors", "primary_goal", "secondary_goals",
+               "success_criteria", "in_scope", "out_of_scope", "user_journeys",
+               "product_requirements", "business_rules", "assumptions",
+               "constraints", "open_questions"],
+  "properties": {
+    "document_id": {"type": "string", "minLength": 1},
+    "product": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "created": {"type": "string", "minLength": 1},
+    "status": {"type": "string", "enum": ["READY_FOR_FR", "BLOCKED"]},
+    "blocking_issues": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "owner": {"type": "string"},
+    "target_release": {"type": "string"},
+    "problem_statement": {"type": "string", "minLength": 1},
+    "actors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["actor", "description", "primary_goal"],
+        "properties": {
+          "actor": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1},
+          "primary_goal": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "primary_goal": {"type": "string", "minLength": 1},
+    "secondary_goals": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "success_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["goal", "metric", "target"],
+        "properties": {
+          "goal": {"type": "string"},
+          "metric": {"type": "string"},
+          "target": {"type": "string"}
+        }
+      }
+    },
+    "in_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "out_of_scope": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "user_journeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "steps"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "steps": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "product_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "capability", "description", "priority"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^PR-[0-9]{3,}$"},
+          "capability": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1},
+          "priority": {"type": "string", "enum": ["Must Have", "Should Have", "Could Have"]},
+          "acceptance_intent": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "business_rules": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "mvp_metrics": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "deferred_analytics": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "assumptions": {
+      "type": "object",
+      "required": ["user", "business", "workload", "technical"],
+      "properties": {
+        "user": {"type": "array", "items": {"type": "string"}},
+        "business": {"type": "array", "items": {"type": "string"}},
+        "workload": {"type": "array", "items": {"type": "string"}},
+        "technical": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["business", "regulatory", "technical", "time_cost"],
+      "properties": {
+        "business": {"type": "array", "items": {"type": "string"}},
+        "regulatory": {"type": "array", "items": {"type": "string"}},
+        "technical": {"type": "array", "items": {"type": "string"}},
+        "time_cost": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number", "question", "status"],
+        "properties": {
+          "number": {"type": "integer"},
+          "question": {"type": "string", "minLength": 1},
+          "owner": {"type": "string"},
+          "status": {"type": "string", "enum": ["Open", "Resolved"]}
+        }
+      }
+    },
+    "design_boundary_note": {"type": "string"}
+  }
+}

@@ -1,6 +1,6 @@
 ---
 name: functional-requirements
-description: Produces a versioned Functional Requirements Document (with a machine-readable data contract) from a product idea, as stage 1 of a four-stage design pipeline (functional-requirements → non-functional-requirements → architecture-design → mermaid-js). Use this whenever the user describes a product idea, feature, or app concept and wants requirements captured, or explicitly asks to run/update the "functional requirements" stage of the design pipeline. Also use it when re-invoked by the design-pipeline-orchestrator skill. Do not use this for non-functional/quality requirements (throughput, latency, availability) or for anything architectural (databases, APIs-as-implementation, cloud services) — those belong to the other pipeline skills.
+description: Produces a versioned Functional Requirements Document (with a machine-readable data contract) from a Mini-PRD, as stage 1 of a five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js). Use this whenever the user wants detailed, testable functional requirements derived from an existing Mini-PRD, or explicitly asks to run/update the "functional requirements" stage of the design pipeline. Also use it when re-invoked by the design-pipeline-orchestrator skill. Do not use this for non-functional/quality requirements (throughput, latency, availability) or for anything architectural (databases, APIs-as-implementation, cloud services) — those belong to the other pipeline skills. Do not use this before a Mini-PRD exists — use the mini-prd skill first.
 ---
 
 # Functional Requirements
@@ -15,38 +15,46 @@ shares.
 ## Step 1: Get the project ID
 
 Before anything else, work out which project this is —
-`references/pipeline-conventions.md` has the exact procedure. Since this is
-usually the first stage invoked for a brand-new product, you're often the
-one asking "new project, existing ID, or a path to existing documents?"
-and minting the ID via `resolve-project --name "<short name>"` for a new
-one (or `resolve-project --path "<path>"` to adopt an existing folder that
-isn't registered yet — see conventions doc). Every `pipeline_tool.py` call
-below assumes you've done this and shows `--project <id>` accordingly —
-always place it **before** the subcommand.
+`references/pipeline-conventions.md` has the exact procedure (check
+conversation for an existing ID or a path to existing documents,
+otherwise ask the user whether it's new/existing/a path, then confirm via
+`resolve-project`). This skill is never the first stage run for a
+brand-new project (mini-prd always runs first), so you should normally be
+*confirming* an ID the user already has rather than minting one — if the
+user seems to be starting completely fresh with no Mini-PRD yet, that's a
+sign to point them at `mini-prd` (or the orchestrator) instead. Every
+`pipeline_tool.py` call below assumes a confirmed `--project <id>`, placed
+**before** the subcommand, and its `path` (documents live in a dedicated
+folder under the user's home directory, or `C:\` on Windows — see
+`references/pipeline-conventions.md` — not wherever this session happens
+to be running).
 
-A project ID being already present when the user starts talking to you is
-itself informative: it means you're likely resuming, not starting fresh —
-run `plan` (see Finishing) or just proceed with the idea they give you,
-which `next-version` will treat as a revision automatically.
+## Input gate
 
-Documents for this project live in a dedicated folder outside your working
-directory (the user's home directory, or `C:\` on Windows — see
-`references/pipeline-conventions.md`), not wherever this session happens
-to be running. `resolve-project`'s output includes the exact `path` — hang
-onto it for constructing file paths in Finishing.
+```
+python scripts/pipeline_tool.py --project <id> check-ready mini-prd
+```
 
-## Input
+If this exits non-zero, stop immediately and report the exact message —
+something like: `ERROR: Mini-PRD is required.` Do not attempt to
+reconstruct a Mini-PRD from memory or from earlier conversation, and
+don't start interviewing the user about the product yourself from
+scratch — that interview belongs to the `mini-prd` skill. The gate exists
+precisely so this skill never free-floats without a grounded,
+user-approved product brief to derive requirements from.
 
-The only input is the product idea. There is no upstream document to
-validate — this is the one skill in the pipeline with no `check-ready` gate.
+If it succeeds, load both the `.md` and `.data.json` at the paths it
+printed, then run:
 
-- If the user gave you the idea directly in conversation, record it:
-  `echo "<idea text>" | python scripts/pipeline_tool.py --project <id> set-idea`
-- If a product idea has already been recorded for this project and the
-  user hasn't given you new idea text, use the existing one — read it with
-  `python scripts/pipeline_tool.py --project <id> latest product-idea` and
-  load the file at `doc_path`.
-- If neither exists, ask the user for the product idea. Don't invent one.
+```
+python scripts/pipeline_tool.py --project <id> validate-data mini-prd
+```
+
+Record the `PASS`/`FAIL` result in your own document's "Mini-PRD Input"
+field. A `FAIL` here means the upstream data contract is structurally
+broken even though its status claimed READY — treat that as a blocking
+condition and don't proceed to derive requirements against it; report it
+instead.
 
 ## Baseline for incremental updates
 
@@ -54,15 +62,38 @@ Run `python scripts/pipeline_tool.py --project <id> next-version functional-requ
 If it returns a `previous_doc_path`/`previous_data_path`, read both — you're
 revising the document, not starting fresh. Keep everything that's still
 true (including FR-N numbering — never renumber an existing requirement
-just because you're producing a new version); change only what the new or
-updated idea actually implies changed. Say what changed in your envelope's
-`summary`. Also read the previous `data.json`'s `mvp` object — you need
-its `number` and `total_included` to work out this round's MVP number and
-where FR numbering continues from (see "Work in MVP-sized batches" below).
+just because you're producing a new version); change only what the
+Mini-PRD's current content actually implies changed. Say what changed in
+your envelope's `summary`. Also read the previous `data.json`'s `mvp`
+object — you need its `number` and `total_included` to work out this
+round's MVP number and where FR numbering continues from (see "Work in
+MVP-sized batches" below).
+
+## Seeding from the Mini-PRD (first run only)
+
+If this is the very first version (no `previous_doc_path`), the Mini-PRD's
+own scoping does most of the initial prioritization work for you — don't
+start from a blank slate:
+
+- Its **Section 4.1 (In Scope)** list and **Section 6 (Product
+  Requirements, `PR-NNN`)** entries are your primary source for this
+  round's candidate requirements — each `PR-NNN` typically elaborates into
+  one or more `FR-NNN` entries (set `source_pr` accordingly on each).
+- Its **Section 4.2 (Out of Scope)** list should be added to your backlog
+  right away, before you even get to step 3 below:
+  `python scripts/pipeline_tool.py --project <id> backlog-add functional-requirements --text "..." --source skill`
+  for each out-of-scope item — this is what makes the Mini-PRD's explicit
+  scope boundary actually carry forward instead of being re-litigated
+  later.
+
+On later rounds (revisions or new MVPs), the Mini-PRD is usually
+unchanged and this seeding step doesn't repeat — you're working from your
+own backlog and previous version at that point, per "Work in MVP-sized
+batches" below.
 
 ## Work in MVP-sized batches
 
-Don't enumerate every functional requirement the idea implies in one
+Don't enumerate every functional requirement the Mini-PRD implies in one
 shot. A large, fully-specified requirements set up front is harder for
 the user to review meaningfully, and it front-loads decisions (priority,
 scope) that are easier to make well in smaller batches with real feedback
@@ -74,9 +105,9 @@ in between. Instead:
    and they didn't fit, or because the user added them directly between
    sessions.
 2. **Think through the full scope, privately** — combine the backlog with
-   anything new the current idea/conversation implies, so your
-   prioritization is informed by the whole picture, not just whatever
-   comes to mind first.
+   the Mini-PRD's Product Requirements and In Scope list (and anything new
+   the current conversation implies), so your prioritization is informed
+   by the whole picture, not just whatever comes to mind first.
 3. **Select the ~10 most important requirements for this round** — the
    ones that are foundational (other capabilities depend on them),
    highest priority, or make up a coherent, shippable slice on their own.
@@ -99,8 +130,8 @@ in between. Instead:
 6. **Mark `is_final: true`** only when there's genuinely nothing left
    worth deferring — i.e., the backlog is empty (or everything left in it
    was explicitly dropped) and this round's requirements plus everything
-   already included cover what the idea implies. Most first rounds should
-   be `is_final: false`.
+   already included cover the Mini-PRD's Product Requirements and In
+   Scope list. Most first rounds should be `is_final: false`.
 
 This applies to every run of this skill, not just the very first one —
 "starting a new MVP" and "revising functional-requirements" are the same
@@ -140,7 +171,7 @@ requirement, not the implementation.
 
 Fill in `templates/functional-requirements.md` exactly — don't drop or
 reorder its sections, even if a section ends up brief (write "None
-implied by the idea" rather than omitting a section). Each individual
+implied by the Mini-PRD" rather than omitting a section). Each individual
 requirement gets its own `#### FR-NNN` block with every field the template
 lists (Name, Actor, Priority, Description, Preconditions, Trigger, Main
 Flow, Alternative Flows, Failure Behavior, Business Rules, Dependencies) —
@@ -158,12 +189,13 @@ equivalent, not just prose. This is the actual contract
 
 ## No hallucination
 
-If the product idea is too vague to derive real requirements (e.g., "build
-me an app"), don't invent a fictional feature set to fill the template.
-Write your best-effort interpretation plus the specific questions that
-would unblock you into "Open Questions," and set the Completeness
-Assessment to `BLOCKED` with those questions listed as blocking issues. A
-short, honest document beats a long, made-up one.
+If the Mini-PRD is too vague in places to derive real requirements from
+(e.g. a product requirement with no acceptance intent at all), don't
+invent a fictional feature set to fill the template. Write your
+best-effort interpretation plus the specific questions that would unblock
+you into "Open Questions," and set the Completeness Assessment to
+`BLOCKED` with those questions listed as blocking issues. A short, honest
+document beats a long, made-up one.
 
 ## Completeness Assessment
 
@@ -198,10 +230,10 @@ field that answers that question; most rounds will be `READY_FOR_NFR` with
 
 ## Human review checkpoint — before writing anything to disk
 
-A product idea is rarely complete on its own — the user may have
-additional capabilities, edge cases, or actors in mind that the idea as
-stated didn't spell out. Don't treat your first draft as final just
-because it's internally consistent, and don't leave the backlog as a
+A Mini-PRD is rarely complete on its own — the user may have additional
+capabilities, edge cases, or actors in mind that didn't make it into the
+Mini-PRD's product requirements. Don't treat your first draft as final
+just because it's internally consistent, and don't leave the backlog as a
 buried afterthought — surface it as an active suggestion.
 
 Draft the full document (and your intended Completeness Assessment)
@@ -246,8 +278,8 @@ further review):
    out-of-scope this round that isn't already on the backlog, `backlog-add
    ... --source skill` (see "Work in MVP-sized batches"). Leave everything
    else pending.
-4. Hash the product idea input: `python scripts/pipeline_tool.py --project <id> latest product-idea`
-   (use its `hash` and `version` in your envelope's `inputs_consumed`).
+4. Record `inputs_consumed`: the `mini-prd` version + hash from the
+   `check-ready` output in the Input gate above.
 5. Validate your own data file before finalizing:
    `python scripts/pipeline_tool.py --project <id> validate-data functional-requirements --path <project-root>/functional-requirements/v<version>.data.json`
    — fix any reported errors before proceeding.

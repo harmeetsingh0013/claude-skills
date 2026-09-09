@@ -22,86 +22,184 @@ READY_FOR_MERMAID — see references/pipeline-conventions.md.
 ### Missing Information
 ### Assumptions
 
-## 4. Architectural Drivers
+## 4. Ubiquitous Language
+
+Table: Term | Definition | Bounded Context (if the term is specific to
+one). Draw terms from the FR/NFR documents' own vocabulary — don't invent
+new names for things they already named. If the same word means different
+things in different areas, that's usually a sign of separate bounded
+contexts (see section 5), and each meaning gets its own row here.
+
+| Term | Definition | Bounded Context |
+|------|------------|------------------|
+
+## 5. Bounded Contexts (Strategic Design)
+
+Identify the bounded contexts this system decomposes into. See
+`references/ddd-glossary.md` for the heuristics (capability groupings,
+differing NFR profiles, vocabulary splits, ownership boundaries). **Each
+bounded context here is what becomes a module for future implementation
+planning** — see section 35.
+
+### BC-01: <name>
+**Responsibility:**
+**Core aggregates:** (named here, detailed in section 8)
+**Related requirements:** FR-N, NFR-N, ...
+
+### BC-02: <name>
+...
+
+## 6. Context Map (Strategic Design)
+
+Every relationship between two bounded contexts, using one of the
+patterns in `references/ddd-glossary.md` (Partnership, Shared Kernel,
+Customer-Supplier, Conformist, Anticorruption Layer, Open Host Service,
+Published Language, Separate Ways) — never leave a relationship unlabeled.
+
+| From | To | Relationship | Rationale |
+|------|-----|--------------|-----------|
+
+## 7. Architectural Drivers
 
 The FRs/NFRs that most shape this design, and the driver they produce.
 Use the FR+NFR -> driver -> decision -> technology-evaluation ->
 technology-decision chain (see references/architecture-reasoning.md) —
-don't jump straight from a requirement to a named technology.
+don't jump straight from a requirement to a named technology. Note which
+architectural drivers directly motivated a bounded context split in
+section 5 (e.g. an NFR forcing a consistency/availability split is
+usually also the reason two things became separate contexts, not just
+separate technologies).
 
-## 5. System Context
+## 8. Tactical Design
 
-## 6. Architecture Overview
+Per bounded context: its aggregates (aggregate root, the entities/value
+objects it contains, and its invariants — what must always hold true
+after a transaction), and the domain events it publishes or consumes.
+Prose descriptions only — no class definitions, method signatures, or
+code; see `references/ddd-glossary.md` for what belongs here vs. what's
+implementation.
 
-## 7. Architecture Alternatives
+### BC-01: <name>
 
-## 8. Architecture Decisions
+**Aggregate: <name>**
+- Aggregate root:
+- Entities:
+- Value objects:
+- Invariants:
+
+**Domain events published:**
+- `<EventName>` — when it fires, what it carries, who's known to consume it
+
+**Domain events consumed:**
+- `<EventName>` from BC-0N — how this context reacts to it
+
+### BC-02: <name>
+...
+
+## 9. Architecture Decisions
 
 ### ADR-001
 ### ADR-002
 ...
-(see references/adr-format.md for the format of each entry)
+(see references/adr-format.md for the format of each entry; reference the
+bounded context(s) an ADR affects where relevant)
 
-## 9. Component / Service Architecture
+## 10. Component / Service Architecture
 
-## 10. Request Flows
+State explicitly whether each component maps 1:1 to a bounded context, or
+whether multiple contexts are pragmatically combined into one deployable
+component (and why — e.g. low individual traffic doesn't justify separate
+services yet). A component silently crossing bounded-context lines without
+a stated reason is worth a second look.
 
-## 11. Data Architecture
+## 11. Request Flows
 
-## 12. Data Model
+## 12. Data Architecture
 
-## 13. API Design
+Note where a bounded context owns its own data store vs. shares one, and
+why — sharing storage across bounded contexts is usually a sign of a
+Shared Kernel relationship (see section 6) and should be named as such.
 
-## 14. Caching Architecture
+## 13. Data Model
 
-## 15. Messaging / Event Architecture
+## 14. API Design
 
-## 16. Consistency & Concurrency
+## 15. Caching Architecture
 
-## 17. Security Architecture
+## 16. Messaging / Event Architecture
 
-## 18. Scalability Architecture
+Should directly implement the domain events named in section 8 and the
+Published Language / Open Host Service relationships named in section 6
+— this section is where those become a concrete technology choice.
 
-## 19. Availability Architecture
+## 17. Consistency & Concurrency
 
-## 20. Reliability & Resilience
+State the consistency boundary explicitly in terms of aggregates (section
+8): strong consistency within an aggregate, eventual consistency across
+aggregates and across bounded contexts, coordinated via domain events.
 
-## 21. Disaster Recovery
+## 18. Security Architecture
 
-## 22. Observability
+## 19. Scalability Architecture
 
-## 23. Deployment Architecture
+## 20. Availability Architecture
 
-## 24. Technology Selection
+## 21. Reliability & Resilience
 
-## 25. Technology Alternatives
+## 22. Disaster Recovery
 
-## 26. Architecture Trade-offs
+## 23. Observability
 
-## 27. Failure Mode Analysis
+## 24. Deployment Architecture
 
-## 28. Capacity / Scaling Analysis
+## 25. Technology Selection
 
-## 29. Requirements Traceability
+## 26. Technology Alternatives
+
+## 27. Architecture Trade-offs
+
+## 28. Failure Mode Analysis
+
+## 29. Capacity / Scaling Analysis
+
+## 30. Requirements Traceability
 
 Table: FR-N/NFR-N -> section(s) of this document that address it. Flag any
 requirement that isn't addressed anywhere.
 
-## 30. Architecture Validation
+## 31. Architecture Validation
 
-## 31. Risks
+## 32. Risks
 
-## 32. Open Questions
+## 33. Open Questions
 
-## 33. Future Evolution
+## 34. Future Evolution
 
-## 34. Mermaid Diagram Specification
+## 35. Module & Task Breakdown Map
+
+One row per bounded context (= module). This is the forward-looking
+deliverable for a future implementation task-breakdown — this skill
+defines clean module boundaries and their dependency order; it does not
+produce actual tickets, code, or implementation detail.
+
+| Module (Bounded Context) | Depends On | Suggested Task Granularity | MVP Alignment |
+|---------------------------|------------|------------------------------|-----------------|
+
+"Suggested Task Granularity" is a coarse category list (e.g. "schema/
+migration," "aggregate + domain logic," "application service," "API
+endpoint(s)," "event publisher/consumer") — categories a future
+task-breakdown step would expand into real tasks, not the tasks
+themselves.
+
+## 36. Mermaid Diagram Specification
 
 List each diagram mermaid-js should produce: name, type (one of
 system-context / container-architecture / request-flow / data-flow /
 sequence-diagram / deployment-architecture / entity-relationship /
-state-diagram), and what it must show. Only list diagrams the design
-actually warrants — not one of every type by default.
+state-diagram / context-map), and what it must show. Only list diagrams
+the design actually warrants — not one of every type by default. A
+context-map diagram (section 6) is usually worth including once there's
+more than one bounded context.
 
 ## MVP Scope
 
@@ -111,7 +209,11 @@ Is this the final MVP?
 Design only for this MVP's FR/NFR scope — don't speculatively build
 infrastructure for deferred requirements that haven't been approved yet.
 Carry forward ADRs/components from earlier MVPs unchanged unless this
-MVP's new requirements actually affect them.
+MVP's new requirements actually affect them. Bounded contexts (section 5)
+are usually stable across MVPs — a new MVP typically adds aggregates or
+tactical detail within an existing context rather than redrawing context
+boundaries; if a genuinely new problem area appears, a new bounded context
+is fine, but don't reshuffle existing ones without a real reason.
 
 ## Completeness Assessment
 

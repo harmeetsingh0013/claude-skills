@@ -214,13 +214,31 @@ against an NFR capped at 100 concurrent users triggers a `CONFLICT` report
 instead of a guess), and requires every consequential decision to follow a
 visible chain: **requirement → architectural driver → decision → technology
 evaluation → technology choice** — never a straight jump to a technology
-name. Produces the full design document plus Architecture Decision Records
+name.
+
+It uses a **Domain-Driven Design** approach: pull a shared **ubiquitous
+language** from the FR/NFR vocabulary, partition the system into
+**bounded contexts** (using capability groupings, differing NFR profiles,
+and vocabulary splits as the signals), map how those contexts relate
+(Partnership, Shared Kernel, Customer-Supplier, Conformist,
+Anticorruption Layer, Open Host Service, Published Language, or Separate
+Ways — always named, never left implicit), then work out each context's
+**aggregates, entities, and domain events** before making any technology
+choice. Every bounded context doubles as a **module** — the document ends
+with a Module & Task Breakdown Map (dependencies + coarse task categories
+per module) meant to feed a future implementation planning step. This
+skill designs; it never writes implementation code, class definitions, or
+DDL — that's explicitly out of scope even here.
+
+Produces the full design document plus Architecture Decision Records
 (ADRs) and a specification of exactly which diagrams are needed.
 
 ### `mermaid-js` (stage 4)
 Pure extraction, not design. Reads the architecture document's diagram
 specifications and produces one `.mmd` file per requested diagram —
-nothing more, nothing invented. Looks for a Mermaid MCP tool first; falls
+nothing more, nothing invented (including a `context-map` diagram type,
+approximated as a labeled flowchart since Mermaid has no native context-map
+diagram). Looks for a Mermaid MCP tool first; falls
 back to hand-written Mermaid syntax if none is available, and honestly
 reports which diagrams were tool-validated versus only manually reviewed.
 
