@@ -24,9 +24,9 @@ fresh with no FR document yet, that's a sign to point them at
 `functional-requirements` (or the orchestrator) instead. Every
 `pipeline_tool.py` call below assumes a confirmed `--project <id>`, placed
 **before** the subcommand, and its `path` (documents live in a dedicated
-folder under the user's home directory, or `C:\` on Windows — see
-`references/pipeline-conventions.md` — not wherever this session happens
-to be running).
+folder wherever the user chose when the project was created — see
+`references/pipeline-conventions.md` — the current working directory
+only if the user had no preference).
 
 ## Input gate
 

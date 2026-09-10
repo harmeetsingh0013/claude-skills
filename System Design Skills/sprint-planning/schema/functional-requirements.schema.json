@@ -1,0 +1,97 @@
+{
+  "$id": "functional-requirements.schema.json",
+  "title": "Functional Requirements Document — data contract",
+  "type": "object",
+  "required": ["document_id", "product", "version", "created", "input_document", "status", "mvp", "actors", "requirements", "traceability"],
+  "properties": {
+    "document_id": {"type": "string", "minLength": 1},
+    "product": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "created": {"type": "string", "minLength": 1},
+    "input_document": {
+      "type": "object",
+      "required": ["type", "version", "validation"],
+      "properties": {
+        "type": {"type": "string", "enum": ["mini-prd"]},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+        "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+      }
+    },
+    "status": {"type": "string", "enum": ["READY_FOR_NFR", "BLOCKED"]},
+    "blocking_issues": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "mvp": {
+      "type": "object",
+      "required": ["number", "new_in_this_mvp", "total_included", "is_final"],
+      "properties": {
+        "number": {"type": "integer"},
+        "new_in_this_mvp": {"type": "integer", "minimum": 1, "maximum": 12},
+        "total_included": {"type": "integer"},
+        "is_final": {"type": "boolean"},
+        "deferred": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "actors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "domain_entities": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "required": ["id", "capability", "name", "actor", "priority", "description", "status", "mvp_number"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^FR-[0-9]{3,}$"},
+          "capability": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1},
+          "actor": {"type": "string", "minLength": 1},
+          "priority": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+          "description": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "enum": ["Draft", "Approved", "Blocked"]},
+          "mvp_number": {"type": "integer"},
+          "source_pr": {"type": "string", "pattern": "^PR-[0-9]{3,}$"},
+          "preconditions": {"type": "string"},
+          "trigger": {"type": "string"},
+          "main_flow": {"type": "string"},
+          "alternative_flows": {"type": "string"},
+          "failure_behavior": {"type": "string"},
+          "business_rules": {"type": "string"},
+          "dependencies": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "traceability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "capability", "actor", "priority", "status"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^FR-[0-9]{3,}$"},
+          "capability": {"type": "string"},
+          "actor": {"type": "string"},
+          "priority": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+          "status": {"type": "string", "enum": ["Draft", "Approved", "Blocked"]}
+        }
+      }
+    }
+  }
+}

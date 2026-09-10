@@ -19,10 +19,13 @@ Before anything else, work out which project this is —
 `references/pipeline-conventions.md` has the exact procedure. Since this
 is normally the *first* stage invoked for a brand-new product, you're
 often the one asking "new project, existing ID, or a path to existing
-documents? If it's new, what should I call it?" and minting the ID via
-`resolve-project --name "<short name>"`. Every `pipeline_tool.py` call
-below assumes you've done this and shows `--project <id>` accordingly —
-always place it **before** the subcommand.
+documents? If it's new, what should I call it, and where would you like
+the documents saved? (I can use the default location if you don't have a
+preference.)" and minting the ID via
+`resolve-project --name "<short name>" --location "<path>"` (omit
+`--location` only if the user explicitly said to use the default). Every
+`pipeline_tool.py` call below assumes you've done this and shows
+`--project <id>` accordingly — always place it **before** the subcommand.
 
 ## Input
 

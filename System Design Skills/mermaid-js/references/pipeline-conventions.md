@@ -1,17 +1,22 @@
 # Design pipeline conventions
 
-These conventions are shared by all six pipeline skills: `mini-prd`,
+These conventions are shared by all seven pipeline skills: `mini-prd`,
 `functional-requirements`, `non-functional-requirements`,
-`architecture-design`, `mermaid-js`, and `design-pipeline-orchestrator`.
-Every skill uses the same `pipeline_tool.py` (a copy lives in each skill's
-`scripts/` folder) and the same five JSON Schemas (copies live in each
-content skill's `schema/` folder), so behavior is identical no matter
-which skill is invoked.
+`architecture-design`, `mermaid-js`, `sprint-planning`, and
+`design-pipeline-orchestrator`. Every skill uses the same
+`pipeline_tool.py` (a copy lives in each skill's `scripts/` folder) and
+the same six JSON Schemas (copies live in each content skill's `schema/`
+folder), so behavior is identical no matter which skill is invoked.
 
-The pipeline is: **mini-prd → functional-requirements →
+The core pipeline is: **mini-prd → functional-requirements →
 non-functional-requirements → architecture-design → mermaid-js**.
 mini-prd is the only stage with no upstream document to gate on — it
 starts from a raw problem/idea description instead.
+
+`sprint-planning` sits outside that cascade: once functional-requirements,
+non-functional-requirements, and architecture-design are all `READY`, it
+can be invoked — independently, on request, once per sprint — to turn the
+design into implementation tasks. See "Sprints and task tracking" below.
 
 ## Every command needs a project ID — and it goes *before* the subcommand
 
@@ -40,15 +45,21 @@ this:
 2. **Otherwise, ask.** Something like: *"Is this a new project, do you
    have an existing project ID (looks like `curious-mango`), or do you
    have the path to an existing project's documents? If it's new, what
-   should I call it — a short name like 'url-shortener' is fine."*
-   - **New project:** run
-     `python scripts/pipeline_tool.py resolve-project --name "<short name>"`
-     with no `--project` (omit `--name` if the user didn't give one). It
-     mints an ID, creates the project's folder (see "Where documents live"
-     below), and registers it. Tell the user the new ID and that they'll
-     need it to resume this project later (they might want to save it
-     somewhere) — the folder path alone won't help them resume through the
-     ID lookup, since that's step 3's path, not this one.
+   should I call it — a short name like 'url-shortener' is fine — and
+   where would you like the documents saved? (If you don't have a
+   preference, I'll create it right here in the current working
+   directory.)"*
+   - **New project:** you now need both a name (optional) and a location
+     (required to ask about, even though a default exists — see below).
+     Run `python scripts/pipeline_tool.py resolve-project --name "<short name>" --location "<path>"`
+     with no `--project` (omit `--name` if the user didn't give one; omit
+     `--location` only if the user explicitly said to use the default —
+     see below). It mints an ID, creates the project's folder there (see
+     "Where documents live" below), and registers it. Tell the user the
+     new ID and that they'll need it to resume this project later (they
+     might want to save it somewhere) — the folder path alone won't help
+     them resume through the ID lookup, since that's step 3's path, not
+     this one.
    - **Existing project — user gives you an ID:** go to step 3.
    - **Existing project — user gives you a path instead of an ID** (e.g.
      they copied the folder from another machine, or don't have the ID
@@ -128,39 +139,55 @@ you don't need to do anything different when calling `finalize`.
 
 ## Where documents live
 
-Documents are **not** written relative to wherever Claude Code happens to
-be running, and **not** inside the skills installation directory. Each
-project gets its own folder directly under a fixed OS-level location:
+**The location is something the user is asked about when creating a new
+project — never decided silently, and there's no hardcoded absolute
+fallback.** See "Getting the project ID" above for the exact question.
+Documents are never written inside the skills installation directory,
+and never silently nested inside a generic subfolder like `design-docs/`
+— but unlike earlier versions of this pipeline, there's no fixed system
+path (home directory, `C:\`, an environment variable) baked in either.
 
-| OS | Location |
-|---|---|
-| macOS / Linux | `$HOME/<slug>-<unique-id>/` |
-| Windows | `C:\<slug>-<unique-id>\` |
+Each project gets its own folder, `<slug>-<unique-id>/`, created under
+whichever location the user specified via `--location` on
+`resolve-project`. `<slug>` comes from the short project name you asked
+the user for (e.g. "URL Shortener" → `url-shortener`); `<unique-id>` is
+the minted ID (e.g. `curious-mango`). If the user didn't give a name, the
+slug falls back to `project`. So a typical project folder might look like
+`~/my-projects/url-shortener-curious-mango/` if the user chose that
+location.
 
-`<slug>` comes from the short project name you asked the user for (e.g.
-"URL Shortener" → `url-shortener`); `<unique-id>` is the minted ID (e.g.
-`curious-mango`). If the user didn't give a name, the slug falls back to
-`project`. So a typical project folder looks like
-`/home/alex/url-shortener-curious-mango/` or
-`C:\url-shortener-curious-mango\`.
+**If the user has no location preference, the fallback is the current
+working directory** — wherever `pipeline_tool.py` is actually being run
+from — not a system-wide default. This makes the fallback
+workspace-relative: a project created with no `--location` from inside
+one working directory (e.g. a repo you're already in) stays associated
+with that directory, similar to how a `.git` folder works. This applies
+to the project's registry entry too, not just its files — see the note
+below.
 
 `pipeline_tool.py` resolves the exact path for you — you never construct
-it by hand. `resolve-project` returns it as `path` in its JSON output; the
-same value comes back from every other command's output wherever a path
-is reported (`latest`, `next-version`, `check-ready`). When writing a new
-document, build its path from that project root: `<project-root>/<doc-type>/vX.Y.md`.
+it by hand. `resolve-project` returns it as `path` in its JSON output
+(along with `location_source`: `"user-specified"` or `"default"`, so you
+know which happened and can report it accurately); the same `path` value
+comes back from every other command's output wherever a path is reported
+(`latest`, `next-version`, `check-ready`). When writing a new document,
+build its path from that project root: `<project-root>/<doc-type>/vX.Y.md`.
 
-**This location can be overridden** by setting the `DESIGN_PIPELINE_HOME`
-environment variable before running `pipeline_tool.py` — useful mainly if
-the default location (home directory, or `C:\` on Windows) isn't writable
-in a given environment. This isn't something to suggest unprompted; only
-mention it if a command actually fails with a permissions error writing to
-the default location.
+**Important consequence of the cwd fallback:** the project registry
+itself (see below) also resolves relative to the current working
+directory when no `--location` was given at creation time — it isn't a
+single global list. Practically: a project created with no `--location`
+is only discoverable (`list-projects`, resuming by `--project <id>`) from
+the same working directory it was created in. If a command reports a
+project ID as not found, and the user is confident the ID is right,
+check whether they might be in a different working directory than when
+it was created — that's the first thing to ask about, not a sign the
+project was lost.
 
 Inside a project's folder, the layout is:
 
 ```
-<project-root>/                          e.g. C:\url-shortener-curious-mango\
+<project-root>/                          e.g. ./url-shortener-curious-mango/
   product-idea/
     current.md
     LATEST.json            # {"version", "hash", "doc_path"}
@@ -179,7 +206,7 @@ Inside a project's folder, the layout is:
     LATEST.json            # doc_path points at the v1.0/ directory
 ```
 
-Separately, a small registry at `<home-or-C:\>/.design-pipeline/projects.json`
+Separately, a small registry at `<current-working-directory>/.design-pipeline/projects.json`
 maps every project's unique ID to its folder and name — this is what
 `resolve-project` and `list-projects` read and write. You don't need to
 touch this file directly; it's internal bookkeeping, not a document.
@@ -392,6 +419,48 @@ contradiction with `code: "CONFLICT_DETECTED"`, and a `summary` describing
 the mismatch in plain language. Still write and finalize a document — a
 short conflict report is a legitimate, useful pipeline output; a design
 built on an unresolved contradiction is not.
+
+## Sprints and task tracking (sprint-planning only)
+
+Sprint documents don't fit the "one fixed doc_type, growing/cumulative"
+pattern the other stages use — each sprint is a new, non-overlapping unit
+of up to 10 tasks, created independently on request. They use **dynamic
+doc types**: `sprints/sprint-01`, `sprints/sprint-02`, and so on, all
+validated against one shared `schema/sprint.schema.json` regardless of
+number. Every generic command (`latest`, `check-ready`, `next-version`,
+`validate-data`, `finalize`, `hash-file`) already works with these
+doc-type strings exactly like any other — you don't need special-cased
+commands to read or write a sprint's `.md`/`.data.json`/`.envelope.json`.
+
+Two things ARE sprint-specific:
+
+- **`next-sprint`** — finds the next sprint number (highest existing
+  finalized sprint + 1, or 1 if none), and reports the previous sprint's
+  paths and which of its tasks aren't yet `DONE`. Use this instead of
+  `next-version` to find *which* sprint you're writing; still use
+  `next-version <that sprint's doc_type>` to get the version number
+  within it.
+- **Task status tracking** — each task's lifecycle
+  (`NOT_READY`/`READY`/`IN_PROGRESS`/`DONE`) lives in a separate,
+  deliberately mutable `status.json` per sprint, not in the versioned
+  document itself (status changes constantly as work happens; the plan's
+  *content* shouldn't churn a version bump every time someone starts or
+  finishes a task). Three commands manage it:
+
+  ```
+  python scripts/pipeline_tool.py --project <id> task-status-init <doc_type> --path <data.json path>
+  python scripts/pipeline_tool.py --project <id> task-status-set <doc_type> --id TASK-NNN --status DONE
+  python scripts/pipeline_tool.py --project <id> task-status-list <doc_type>
+  ```
+
+  `task-status-init` seeds every task's initial status from its
+  `prerequisites` array (checking prerequisite completion **across every
+  sprint**, not just the current one — a task in Sprint 2 can depend on a
+  Sprint 1 task). `task-status-set ... --status DONE` automatically
+  cascades: it re-checks every task in every sprint whose prerequisites
+  include the one just completed, and flips any that are now fully
+  satisfied from `NOT_READY` to `READY`. Never hand-compute which tasks
+  unblock — trust the cascade, then `task-status-list` to see the result.
 
 ## What the orchestrator does that individual skills don't
 

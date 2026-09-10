@@ -1,0 +1,149 @@
+{
+  "$id": "sprint.schema.json",
+  "title": "Sprint (Implementation Task Plan) — data contract",
+  "type": "object",
+  "required": ["document_id", "product", "version", "created", "sprint_number",
+               "status", "is_final_sprint", "input_documents", "sprint_goal",
+               "sprint_scope", "tasks", "sequential_gates",
+               "sprint_completion_criteria"],
+  "properties": {
+    "document_id": {"type": "string", "minLength": 1},
+    "product": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "created": {"type": "string", "minLength": 1},
+    "sprint_number": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["READY", "BLOCKED"]},
+    "blocking_issues": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "is_final_sprint": {"type": "boolean"},
+    "input_documents": {
+      "type": "object",
+      "required": ["functional_requirements", "non_functional_requirements", "architecture_design"],
+      "properties": {
+        "functional_requirements": {
+          "type": "object",
+          "required": ["version", "validation"],
+          "properties": {
+            "version": {"type": "string"},
+            "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+          }
+        },
+        "non_functional_requirements": {
+          "type": "object",
+          "required": ["version", "validation"],
+          "properties": {
+            "version": {"type": "string"},
+            "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+          }
+        },
+        "architecture_design": {
+          "type": "object",
+          "required": ["version", "validation"],
+          "properties": {
+            "version": {"type": "string"},
+            "validation": {"type": "string", "enum": ["PASS", "FAIL"]}
+          }
+        }
+      }
+    },
+    "sprint_goal": {"type": "string", "minLength": 1},
+    "sprint_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "workstream", "execution_mode",
+                     "prerequisites", "blocks", "start_condition",
+                     "scope_in", "scope_out", "acceptance_criteria",
+                     "tests_required", "definition_of_done"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^TASK-[0-9]{3,}$"},
+          "title": {"type": "string", "minLength": 1},
+          "workstream": {"type": "string", "minLength": 1},
+          "execution_mode": {
+            "type": "string",
+            "enum": ["Sequential after prerequisites", "Parallel after prerequisites"]
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^TASK-[0-9]{3,}$"}
+          },
+          "blocks": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^TASK-[0-9]{3,}$"}
+          },
+          "start_condition": {"type": "string", "minLength": 1},
+          "source_references": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "scope_in": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"}
+          },
+          "scope_out": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"}
+          },
+          "tests_required": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["name", "purpose", "steps", "expected_result"],
+              "properties": {
+                "name": {"type": "string"},
+                "purpose": {"type": "string"},
+                "steps": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                },
+                "expected_result": {"type": "string"}
+              }
+            }
+          },
+          "definition_of_done": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "sequential_gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "note"],
+        "properties": {
+          "task_id": {"type": "string", "pattern": "^TASK-[0-9]{3,}$"},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "dependency_graph_diagram": {"type": "string"},
+    "sprint_completion_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}

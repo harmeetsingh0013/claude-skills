@@ -24,10 +24,10 @@ otherwise ask the user whether it's new/existing/a path, then confirm via
 first stage run for a brand-new project, so you should normally be
 *confirming* an ID the user already has. Every `pipeline_tool.py` call
 below assumes a confirmed `--project <id>`, placed **before** the
-subcommand, and its `path` (documents live in a dedicated folder under
-the user's home directory, or `C:\` on Windows — see
-`references/pipeline-conventions.md` — not wherever this session happens
-to be running).
+subcommand, and its `path` (documents live in a dedicated folder
+wherever the user chose when the project was created — see
+`references/pipeline-conventions.md` — the current working directory
+only if the user had no preference).
 
 ## Input gate
 

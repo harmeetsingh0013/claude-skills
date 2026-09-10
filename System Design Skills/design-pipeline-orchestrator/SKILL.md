@@ -29,13 +29,17 @@ in — that's the whole point of asking:
    a path, skip to step 4.
 2. **Otherwise, ask:** *"Is this a new project, do you have an existing
    project ID, or do you have the path to an existing project's
-   documents? If it's new, what should I call it — a short name is
-   fine."*
-   - **New:** `python scripts/pipeline_tool.py resolve-project --name "<short name>"`
-     (no `--project`; omit `--name` if the user didn't give one). This
-     mints an ID, creates its folder, and registers it — tell the user the
-     new ID and that they should hang onto it to resume later (the name
-     alone won't be enough to resume; resuming works through the ID).
+   documents? If it's new, what should I call it, and where would you
+   like the documents saved — I can use the current working directory if
+   you don't have a preference."*
+   - **New:** `python scripts/pipeline_tool.py resolve-project --name "<short name>" --location "<path>"`
+     (no `--project`; omit `--name` if the user didn't give one; omit
+     `--location` only if they explicitly said to use the default). This
+     mints an ID, creates its folder at the location they chose (or the
+     default), and registers it — tell the user the new ID and where it
+     was created, and that they should hang onto the ID to resume later
+     (the name alone won't be enough to resume; resuming works through
+     the ID).
    - **Existing, but they don't remember the exact ID or a path:** run
      `python scripts/pipeline_tool.py list-projects` and show them the
      list (with names and paths) rather than guessing.
@@ -62,11 +66,11 @@ in — that's the whole point of asking:
    - `PATH_NOT_FOUND` → tell the user plainly and ask for a corrected path
      or an ID instead.
 
-Documents for this project are written to a dedicated folder outside
-whatever directory this session happens to be running in — the user's
-home directory, or `C:\` on Windows (see
-`references/pipeline-conventions.md`). `resolve-project`'s output
-includes the exact `path`; you don't need to do anything with it yourself; each stage skill derives its own file paths from it.
+Documents for this project are written to a dedicated project folder —
+wherever the user chose, or the current working directory if they had no
+preference (see `references/pipeline-conventions.md`). `resolve-project`'s
+output includes the exact `path`; you don't need to do anything with it
+yourself; each stage skill derives its own file paths from it.
 
 Every `pipeline_tool.py` call for the rest of this run uses
 `--project <id>` (placed **before** the subcommand — see
@@ -219,10 +223,18 @@ see "Working in MVP-sized batches" in `references/pipeline-conventions.md`).
   should I just prioritize from the backlog myself or is there something
   specific you want pulled in first?"* If they say yes, go back to Step 3
   with "the user wants the next MVP" as the recorded input, and run the
-  pipeline again from `functional-requirements`.
+  pipeline again from `functional-requirements`. You can also mention
+  that `sprint-planning` can generate implementation tasks for what's
+  already built, even before later MVPs are scoped — it only needs FR,
+  NFR, and architecture-design to be READY, not `is_final: true`.
 - **`is_final: true`** — nothing's deferred; the product's full scope (as
   currently understood) is built out. Say so plainly rather than asking
-  about a next MVP that doesn't exist yet.
+  about a next MVP that doesn't exist yet — and mention that the design
+  is now complete enough to generate implementation tasks, if they want:
+  *"The design is fully built out. Want me to generate an implementation
+  sprint from it?"* That's the `sprint-planning` skill — invoke it only if
+  they say yes; it's a separate, on-request capability, not something
+  this orchestrator chains into automatically.
 
 Don't ask about the next MVP after a partial run (a stage stopped on
 `BLOCKED_QUESTION`/`CONFLICT`/`ERROR`, or the user only asked for one

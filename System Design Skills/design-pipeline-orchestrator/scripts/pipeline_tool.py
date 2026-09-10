@@ -15,17 +15,27 @@ user anything itself.
 === Where projects live ===
 
 Each project gets its own folder, named "<slugified-name>-<unique-id>"
-(e.g. "url-shortener-curious-mango"), directly under:
+(e.g. "url-shortener-curious-mango"). **Where that folder is created is
+something the user is asked, not something this tool decides silently,
+and there is no hardcoded absolute fallback** — see
+references/pipeline-conventions.md for the exact question a skill asks
+before minting a new project. Concretely, `resolve-project` (with no
+--project, minting a new project) takes an optional --location <dir>: if
+given, the project folder is created there. If the user has no
+preference, it falls back to the current working directory — i.e.
+wherever this script is actually being run from — not a system-wide
+default like a home directory.
 
-  - macOS/Linux: the user's home directory ($HOME)
-  - Windows: the root of the C:\\ drive
+This means the "no location given" fallback is workspace-relative: a
+project created with no --location from inside one working directory
+(e.g. a repo) stays associated with that directory, the same way a `.git`
+folder would. It's still NOT nested inside a plain "design-docs/"
+subfolder and NOT inside the skills installation directory — it's a
+sibling of wherever you're working, not buried inside it or scattered to
+a fixed system path. Every stage's output for a project lives directly
+under that one project folder:
 
-This is deliberately NOT a subfolder relative to wherever Claude Code
-happens to be running (unlike a plain "design-docs/" folder would be), and
-NOT inside the skills installation directory. Every stage's output for a
-project lives directly under that one project folder:
-
-    <home-or-C:\\>/url-shortener-curious-mango/
+    <chosen-or-cwd-location>/url-shortener-curious-mango/
       product-idea/
       mini-prd/
       functional-requirements/
@@ -33,10 +43,14 @@ project lives directly under that one project folder:
       architecture-design/
       mermaid-diagrams/
 
-Override the base location by setting the DESIGN_PIPELINE_HOME environment
-variable (e.g. if writing to C:\\'s root fails due to permissions) — this
-isn't something a skill should suggest unprompted, but it's there if the
-default location doesn't work in a given environment.
+The registry itself (see below) resolves the same way — it lives under
+whatever the current working directory is when a command runs (or under
+an explicit --location, for resolve-project specifically), not a single
+global system location. Practically: stay in the same working directory
+for a given set of projects and `list-projects`/resuming by ID will find
+them; a project created from a different working directory (with no
+explicit --location either time) won't show up unless you're back in the
+directory it was created from.
 
 Since a project's full folder name includes a human-readable slug that a
 skill doesn't know in advance, project identity is tracked through a small
@@ -118,8 +132,6 @@ Pipeline DAG (doc_type -> required input doc_types, next doc_type):
 import argparse
 import hashlib
 import json
-import os
-import platform
 import random
 import re
 import sys
@@ -197,19 +209,28 @@ FOODS = [
 
 # ---------------------------------------------------------- storage root --
 
-def base_dir() -> Path:
+def base_dir(location_override: str = None) -> Path:
     """
-    Where project folders are created. DESIGN_PIPELINE_HOME overrides
-    everything (useful if the default location isn't writable in a given
-    environment). Otherwise: the user's home directory, or the root of
-    the C:\\ drive on Windows.
+    Where a new project's folder is created. There is no hardcoded
+    absolute fallback (no home directory, no C:\\ drive, no environment
+    variable) — this always resolves to one of exactly two things:
+
+      1. location_override: the path the user was explicitly asked for
+         and gave (via --location on resolve-project).
+      2. If the user had no preference: the current working directory —
+         wherever this script is actually being run from. That's a
+         workspace-relative choice, not a hardcoded system path, so a
+         project created from one working directory naturally stays
+         associated with that workspace.
+
+    This is also where the project registry lives (see registry_path())
+    when no location_override is given — the registry is workspace-local,
+    matching the project-folder fallback, not a single global system
+    location.
     """
-    override = os.environ.get("DESIGN_PIPELINE_HOME")
-    if override:
-        return Path(override)
-    if platform.system() == "Windows":
-        return Path("C:/")
-    return Path.home()
+    if location_override:
+        return Path(location_override).expanduser()
+    return Path.cwd()
 
 
 def registry_path() -> Path:
@@ -333,8 +354,27 @@ def validate_against_schema(data, schema, path="$"):
     return errors
 
 
+# Sprint documents use dynamically-numbered doc types ("sprints/sprint-01",
+# "sprints/sprint-02", ...) rather than one fixed name — there's no bound
+# on how many sprints a project ends up with. They all share one schema
+# (schema/sprint.schema.json) regardless of number.
+SPRINT_DOC_PATTERN = re.compile(r"^sprints/sprint-(\d+)$")
+
+
+def is_known_doc_type(doc_type: str) -> bool:
+    return (doc_type in PIPELINE
+            or doc_type == "product-idea"
+            or bool(SPRINT_DOC_PATTERN.match(doc_type)))
+
+
+def schema_name_for(doc_type: str) -> str:
+    if SPRINT_DOC_PATTERN.match(doc_type):
+        return "sprint"
+    return doc_type
+
+
 def load_schema(doc_type: str):
-    schema_path = SCHEMA_DIR / f"{doc_type}.schema.json"
+    schema_path = SCHEMA_DIR / f"{schema_name_for(doc_type)}.schema.json"
     if not schema_path.exists():
         return None, schema_path
     return json.loads(schema_path.read_text()), schema_path
@@ -449,11 +489,14 @@ def cmd_resolve_project(args):
     inferred or is already taken, mints a fresh ID for it instead — either
     way, registers the path and reports ADOPTED so the caller can tell the
     user which ID to use going forward.
-    With neither: mint a new unique ID, create "<slug>-<id>" under
-    base_dir(), register it, and report NEW. This is the only way a
-    brand-new project comes into being. --name supplies the
+    With neither: mint a new unique ID, create "<slug>-<id>" under the
+    resolved base location, register it, and report NEW. This is the
+    only way a brand-new project comes into being. --name supplies the
     human-readable slug (e.g. "url-shortener"); omit it and the folder is
-    just named "project-<id>".
+    just named "project-<id>". --location supplies WHERE to create it —
+    the calling skill must have asked the user for this (see
+    references/pipeline-conventions.md); if omitted, falls back to the
+    current working directory — there is no hardcoded absolute default.
     """
     registry = read_registry()
 
@@ -540,7 +583,8 @@ def cmd_resolve_project(args):
 
     slug = slugify(args.name)
     folder_name = f"{slug}-{candidate}"
-    root = base_dir() / folder_name
+    base = base_dir(args.location)
+    root = base / folder_name
     root.mkdir(parents=True, exist_ok=True)
 
     registry[candidate] = {
@@ -548,13 +592,16 @@ def cmd_resolve_project(args):
         "slug": slug,
         "folder": folder_name,
         "path": str(root),
+        "location_source": "user-specified" if args.location else "default",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     write_registry(registry)
 
     print("NEW")
     print(json.dumps({"project_id": candidate, "status": "NEW",
-                       "path": str(root), "folder": folder_name}, indent=2))
+                       "path": str(root), "folder": folder_name,
+                       "location_source": registry[candidate]["location_source"]},
+                      indent=2))
 
 
 def cmd_list_projects(args):
@@ -794,7 +841,7 @@ def cmd_finalize(args):
         print(f"ERROR: invalid status {envelope['status']!r}, must be one of {VALID_STATUSES}")
         sys.exit(1)
     doc_type = envelope["document_type"]
-    if doc_type not in PIPELINE and doc_type != "product-idea":
+    if not is_known_doc_type(doc_type):
         print(f"ERROR: unknown document_type {doc_type!r}")
         sys.exit(1)
 
@@ -836,6 +883,169 @@ def cmd_finalize(args):
     print(json.dumps(latest, indent=2))
 
 
+# ------------------------------------------------------------ sprints --
+# Sprints are fundamentally different from the other stages: each one is
+# a new, non-overlapping unit of up to 10 tasks (not a growing/cumulative
+# document), created on request rather than as part of the automatic
+# plan/cascade. A sprint's own doc_type ("sprints/sprint-01", etc.) still
+# uses the same v1.0/v1.1 revision mechanism as everything else (for
+# fixing a sprint's content before any of its tasks are marked done) —
+# what's different is how the NEXT sprint's number is chosen, and that
+# each task within a sprint has its own separate, mutable lifecycle
+# status (NOT_READY/READY/IN_PROGRESS/DONE) tracked outside the versioned
+# document entirely, since task progress changes far more often than the
+# plan itself and isn't a "revision" of it.
+
+def sprints_dir() -> Path:
+    d = ROOT / "sprints"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def status_path_for(sprint_doc_type: str) -> Path:
+    return ROOT / sprint_doc_type / "status.json"
+
+
+def read_task_statuses(sprint_doc_type: str) -> dict:
+    p = status_path_for(sprint_doc_type)
+    if not p.exists():
+        return {}
+    return json.loads(p.read_text())
+
+
+def write_task_statuses(sprint_doc_type: str, statuses: dict):
+    p = status_path_for(sprint_doc_type)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(statuses, indent=2) + "\n")
+
+
+def find_task_status(task_id: str):
+    """Search every known sprint's status.json for this task ID."""
+    d = sprints_dir()
+    for sub in sorted(d.iterdir()):
+        if SPRINT_DOC_PATTERN.match(f"sprints/{sub.name}"):
+            statuses = read_task_statuses(f"sprints/{sub.name}")
+            if task_id in statuses:
+                return statuses[task_id]
+    return None
+
+
+def cmd_next_sprint(args):
+    """
+    Find the next sprint number: the highest existing finalized sprint's
+    number, plus one (or 1 if there are none yet). Also reports the
+    previous sprint's doc/data paths (for reading as context — task
+    numbering continues from it) and, if tracked, which of its tasks
+    aren't yet DONE — a signal (not a hard block) that starting the next
+    sprint might be premature.
+    """
+    d = sprints_dir()
+    existing = []
+    for sub in d.iterdir():
+        if sub.is_dir():
+            m = re.match(r"^sprint-(\d+)$", sub.name)
+            if m and (sub / "LATEST.json").exists():
+                existing.append(int(m.group(1)))
+
+    next_num = max(existing, default=0) + 1
+    result = {
+        "next_sprint_number": next_num,
+        "next_doc_type": f"sprints/sprint-{next_num:02d}",
+        "previous_sprint_number": None,
+        "previous_doc_type": None,
+        "previous_doc_path": None,
+        "previous_data_path": None,
+        "previous_sprint_tasks_not_done": None,
+    }
+    if existing:
+        prev_num = max(existing)
+        prev_doc_type = f"sprints/sprint-{prev_num:02d}"
+        prev_latest = read_latest(prev_doc_type)
+        result["previous_sprint_number"] = prev_num
+        result["previous_doc_type"] = prev_doc_type
+        if prev_latest:
+            result["previous_doc_path"] = prev_latest.get("doc_path")
+            result["previous_data_path"] = prev_latest.get("data_path")
+        statuses = read_task_statuses(prev_doc_type)
+        not_done = [tid for tid, st in statuses.items() if st != "DONE"]
+        result["previous_sprint_tasks_not_done"] = not_done if statuses else None
+
+    print(json.dumps(result, indent=2))
+
+
+def cmd_task_status_init(args):
+    """
+    Seed a freshly-finalized sprint's status.json from its data.json:
+    a task with no prerequisites starts READY; a task with prerequisites
+    starts READY only if every prerequisite is already DONE (checked
+    across ALL sprints, not just this one), otherwise NOT_READY.
+    """
+    data = json.loads(Path(args.path).read_text())
+    statuses = {}
+    for task in data.get("tasks", []):
+        tid = task["id"]
+        prereqs = task.get("prerequisites", [])
+        if not prereqs:
+            statuses[tid] = "READY"
+        else:
+            all_done = all(find_task_status(p) == "DONE" for p in prereqs)
+            statuses[tid] = "READY" if all_done else "NOT_READY"
+    write_task_statuses(args.doc_type, statuses)
+    print("INITIALIZED")
+    print(json.dumps(statuses, indent=2))
+
+
+def cmd_task_status_set(args):
+    valid = {"NOT_READY", "READY", "IN_PROGRESS", "DONE"}
+    if args.status not in valid:
+        print(f"ERROR: status must be one of {valid}")
+        sys.exit(1)
+    statuses = read_task_statuses(args.doc_type)
+    if args.id not in statuses:
+        print(f"ERROR: task {args.id!r} not found in {args.doc_type}'s status "
+              f"tracking — run task-status-init first, or check the ID.")
+        sys.exit(1)
+    statuses[args.id] = args.status
+    write_task_statuses(args.doc_type, statuses)
+    print("UPDATED")
+    print(json.dumps({args.id: args.status}, indent=2))
+
+    # Marking a task DONE may make tasks that depend on it newly READY —
+    # re-derive downstream statuses across all sprints rather than leaving
+    # them stale until someone happens to re-run task-status-init.
+    if args.status == "DONE":
+        d = sprints_dir()
+        for sub in sorted(d.iterdir()):
+            if not sub.is_dir():
+                continue
+            doc_type = f"sprints/{sub.name}"
+            if not SPRINT_DOC_PATTERN.match(doc_type):
+                continue
+            latest = read_latest(doc_type)
+            if not latest or not latest.get("data_path"):
+                continue
+            data_path = Path(latest["data_path"])
+            if not data_path.exists():
+                continue
+            data = json.loads(data_path.read_text())
+            sub_statuses = read_task_statuses(doc_type)
+            changed = False
+            for task in data.get("tasks", []):
+                tid = task["id"]
+                if sub_statuses.get(tid) == "NOT_READY":
+                    prereqs = task.get("prerequisites", [])
+                    if prereqs and all(find_task_status(p) == "DONE" for p in prereqs):
+                        sub_statuses[tid] = "READY"
+                        changed = True
+            if changed:
+                write_task_statuses(doc_type, sub_statuses)
+                print(f"CASCADED: {doc_type} has newly-READY tasks")
+
+
+def cmd_task_status_list(args):
+    print(json.dumps(read_task_statuses(args.doc_type), indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project",
@@ -846,13 +1056,22 @@ def main():
 
     p = sub.add_parser("resolve-project",
                         help="No args: mint a new project (optionally "
-                             "--name <short name>). --project <id>: confirm "
-                             "it exists. --path <path>: adopt an existing "
-                             "design-docs folder not yet in the registry.")
+                             "--name <short name> and --location <dir>). "
+                             "--project <id>: confirm it exists. --path "
+                             "<path>: adopt an existing design-docs folder "
+                             "not yet in the registry.")
     p.add_argument("--name", help="Short human-readable project name, used "
                                    "to build the project folder's slug "
                                    "(e.g. 'url-shortener'). Only used when "
                                    "minting a brand-new project.")
+    p.add_argument("--location", help="Directory to create the new "
+                                       "project's folder under — the "
+                                       "calling skill should have asked "
+                                       "the user for this. Only used when "
+                                       "minting a brand-new project; "
+                                       "falls back to the current working "
+                                       "directory if omitted (no hardcoded "
+                                       "absolute default).")
     p.add_argument("--path", help="Path to an existing project folder to "
                                    "adopt (e.g. copied from another machine, "
                                    "or the registry was lost). Ignored if "
@@ -924,6 +1143,27 @@ def main():
     p.add_argument("envelope_path")
     p.set_defaults(func=cmd_finalize)
 
+    sub.add_parser("next-sprint",
+                    help="Find the next sprint number and previous sprint's "
+                         "context").set_defaults(func=cmd_next_sprint)
+
+    p = sub.add_parser("task-status-init",
+                        help="Seed a sprint's task statuses from its data.json")
+    p.add_argument("doc_type", help="e.g. sprints/sprint-01")
+    p.add_argument("--path", required=True, help="Path to that sprint's data.json")
+    p.set_defaults(func=cmd_task_status_init)
+
+    p = sub.add_parser("task-status-set", help="Update one task's lifecycle status")
+    p.add_argument("doc_type", help="e.g. sprints/sprint-01")
+    p.add_argument("--id", required=True, help="Task ID, e.g. TASK-003")
+    p.add_argument("--status", required=True,
+                    choices=["NOT_READY", "READY", "IN_PROGRESS", "DONE"])
+    p.set_defaults(func=cmd_task_status_set)
+
+    p = sub.add_parser("task-status-list", help="List all task statuses for a sprint")
+    p.add_argument("doc_type", help="e.g. sprints/sprint-01")
+    p.set_defaults(func=cmd_task_status_list)
+
     args = parser.parse_args()
 
     global ROOT
@@ -941,7 +1181,11 @@ def main():
             print(f"ERROR: project '{args.project}' does not exist.\n"
                   f"Run `resolve-project --project {args.project}` to double-"
                   f"check the ID with the user, or omit --project on "
-                  f"resolve-project to start a new project instead.")
+                  f"resolve-project to start a new project instead. Note: "
+                  f"the project registry is tied to the current working "
+                  f"directory — if this project was created from a "
+                  f"different working directory (and no --location was "
+                  f"given), it won't be found from here.")
             sys.exit(2)
         ROOT = Path(entry["path"])
 
