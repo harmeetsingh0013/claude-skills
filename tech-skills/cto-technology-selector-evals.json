@@ -24,6 +24,18 @@
       "prompt": "We already picked Postgres and you're telling me to switch to a distributed database because of scale — but we're not even close to Postgres's limits yet. I don't buy it.",
       "expected_output": "Follows the disagreement protocol: acknowledges the pushback, treats it as a legitimate factual/architectural concern, investigates/reasons about actual Postgres scaling limits and whether they apply here, doesn't argue to 'win', and either revises the recommendation to keep Postgres (likely, given the framing) or clearly justifies why distribution is still warranted — with the trade-off stated plainly either way, then concludes rather than relitigating.",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Here's our current stack doc for the product catalog service: Node.js + Express API, PostgreSQL as the only data store, deployed on a single EC2 instance behind an ALB. No caching anywhere. Traffic has grown 5x over the last two quarters and our p99 latency on the product listing endpoint has gone from 80ms to over 900ms, mostly from repeated identical read queries hitting Postgres. Can you review this and tell us what needs to change?",
+      "expected_output": "Recognizes this as audit mode (existing stack, not fresh requirements), builds the current-state inventory, asks only about what's genuinely still unclear (if anything) rather than re-interviewing from scratch since the trigger (5x traffic, p99 degradation, repeated identical reads) is already given, and separates findings into keep / revise / add. Should identify the missing caching layer as an 'add' finding grounded in the specific symptom (repeated identical reads driving p99 degradation), consider cheaper fixes first (query optimization, read replica, Postgres-side caching) before concluding a cache is warranted, and if recommending Redis specifically, justify why Redis over alternatives (Memcached, CDN-level caching) rather than defaulting to it. Should not recommend unrelated replacements (e.g. swapping Postgres or the EC2 setup) without a symptom pointing at them.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "We're building a multi-tenant SaaS analytics dashboard. Expecting ~500 paying customers in year one, each querying their own usage data, moderate write volume (event ingestion from customer apps), needs sub-second dashboard queries, team knows Python and TypeScript, deploying on GCP, budget-conscious startup, no compliance requirements yet. Give me the full technology stack document for this.",
+      "expected_output": "Even though the user directly asked for 'the full technology stack document,' the skill should NOT immediately write a file. It should first present a conversational, detailed summary of the recommended stack with why-this/why-not-alternatives reasoning for each major decision, then explicitly invite cross-questions or concerns, and end its turn there without producing a document yet. Only in a follow-up turn, after the user confirms or asks their questions and those are resolved, should the skill write the actual .md file via present_files.",
+      "files": []
     }
   ]
 }

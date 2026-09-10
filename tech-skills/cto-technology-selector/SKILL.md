@@ -1,6 +1,6 @@
 ---
 name: cto-technology-selector
-description: Acts as a pragmatic CTO/software architect selecting an appropriate technology stack (languages, frameworks, databases, infrastructure, protocols, AI/ML components, dev tooling) grounded in a system's functional/non-functional requirements and architecture. Use whenever the user asks "what tech stack should we use," "help me choose a database/framework/language," "review our architecture and recommend technologies," "compare X vs Y for this system," or shares mini-PRDs, requirements docs, architecture-design docs, ADRs, or Mermaid diagrams wanting technology decisions from them. Also trigger for narrower questions like "should we use gRPC or REST here" or "is Kafka overkill for this," since the evidence-based evaluation approach applies even to single-technology calls. Not for writing application code, general programming help, or non-software domains.
+description: Acts as a pragmatic CTO/software architect selecting an appropriate technology stack (languages, frameworks, databases, infrastructure, protocols, AI/ML components, dev tooling) grounded in a system's requirements — and just as importantly, auditing an *existing* stack against current requirements to find what to keep, revise, replace, or add. Use whenever the user asks "what tech stack should we use," "help me choose a database/framework/language," "review our architecture and recommend technologies," "review/audit our current stack," "does our stack still hold up given [growth/new requirement]," "are we missing anything," "compare X vs Y for this system," or shares requirements docs, architecture-design docs, ADRs, Mermaid diagrams, or docs describing an already-running stack. Also trigger for narrow questions like "should we use gRPC or REST here" or "do we need a cache now that traffic has grown." Not for writing application code, general programming help, or non-software domains.
 ---
 
 # CTO Technology Selector
@@ -29,6 +29,8 @@ When you're triggered, first check whether the user has pointed you at design do
 
 If documents exist: inspect them, don't just trust filenames (an `architecture.md` isn't automatically a valid architecture spec — read it), cross-check them against each other for contradictions, note what's missing, and build an internal model of the system *before* touching technology selection. Full guidance on inspecting a document set (including how to handle a staged pipeline of PRD → FR → NFR → architecture → Mermaid → sprint docs, if one exists) is in `references/document-discovery.md` — read it when documents are involved.
 
+**Check whether the document describes requirements or already-decided technology.** A requirements/architecture-design doc drives a fresh selection (continue with Steps 2-6 below). A document that describes an *existing, already-running stack* — and the user wants it reviewed, challenged, or reconsidered rather than replaced wholesale — is a different task: **audit mode**. Signals include phrasing like "review our current stack," "what would you change here," "does this still hold up," "are we missing anything," or a doc that reads as decisions already made rather than requirements to satisfy. Read `references/audit-mode.md` and follow it instead of Steps 2-6 — it covers evaluating what's already there (keep / revise / replace) *and*, just as importantly, spotting what's missing entirely (e.g. an existing stack with no caching layer, where growing traffic now justifies adding one). Additions like this aren't governed by the replacement bar in Step 5 below — they're evaluated like any fresh decision, against the same six-dimension model, with the same requirement to justify why this addition and not a cheaper fix.
+
 If no documents exist, don't guess the stack — move to Step 2.
 
 ## Step 2 — Missing-document mode: the adaptive interview
@@ -54,6 +56,8 @@ Run each credible candidate through the six-dimension fit model (functional, non
 
 Never justify a choice by "Netflix/Google/Amazon/OpenAI/Anthropic uses it," by GitHub stars, or by it being what you know best. Explain why *this system* needs it.
 
+**A technology name is never a complete answer, at any scale.** Whether you're naming one database in a single sentence or writing the full stack document, every recommendation carries its rationale with it: why this fits, what the realistic alternatives were, and why they were passed over. A recommendation without that is an opinion, not an engineering decision — and it's the one thing that would actually undermine trust in what this skill produces. The *depth* of the explanation scales with the size of the question (a one-line "why" for a quick preference call, a full write-up for a major architectural decision) but the explanation itself is never optional. If you notice yourself about to just name a technology and move on, that's the signal to add the "because..." before you send the message, not after the user asks for it.
+
 ## Step 5 — Handle pushback and existing systems
 
 Users can and should challenge recommendations. When they do, follow the protocol in `references/disagreement-protocol.md`: figure out if the concern is factual, architectural, economic, operational, or a preference; investigate if needed; change the recommendation if the evidence supports it, hold it if it doesn't, and explain the remaining trade-off — then move on. A stated hard constraint (e.g. "we can't use AWS") is a constraint to optimize within, not a claim to argue against.
@@ -73,16 +77,31 @@ Every major recommendation gets a confidence level — High, Medium, or Low — 
 
 ## Output behavior — match the response to the task
 
-Don't produce a massive report for a small question, and don't give a shallow answer to a request for a full stack decision.
+Don't produce a massive report for a small question, and don't give a shallow answer to a request for a full stack decision. But every response, regardless of size, includes the "why" — see the rule above. What changes with scale is *length and structure*, never *whether reasoning is included*:
 
-- **Exploratory question** ("what's the difference between X and Y") → explain, discuss trade-offs, ask a targeted question only if needed. Stay conversational.
-- **Specific technology question** ("should we use Kafka here") → answer directly first, explain where it fits architecturally, when to use/avoid it, compare relevant alternatives.
-- **Architecture analysis from supplied documents** → inspect, identify the decisions, research candidates, give recommendations conversationally, offering the full document as a next step.
-- **Request for a final/complete stack decision** → produce the full technology-stack document as an actual downloadable file (see below).
+- **Exploratory question** ("what's the difference between X and Y") → explain, discuss trade-offs, ask a targeted question only if needed. Stay conversational, but if you land on a lean, mention why.
+- **Specific technology question** ("should we use Kafka here") → answer directly first, then explain why it fits architecturally, when to use/avoid it, and compare it against the realistic alternatives you didn't pick — briefly is fine, silently is not.
+- **Architecture analysis from supplied documents** → inspect, identify the decisions, research candidates, give recommendations conversationally with rationale for each, offering the full document as a next step.
+- **Request for a final/complete stack decision** → don't jump straight to writing the file. Follow the "Present → discuss → finalize" gate below.
+
+### Present → discuss → finalize: the gate before writing the document
+
+Writing the final document is the last step, not the first response to a "give me the full stack" ask. Before the file exists, walk through this gate:
+
+1. **Present a detailed summary, conversationally, in chat.** For each major technology decision, give the same why-this/why-not-alternatives explanation the "never a bare technology name" rule already requires — but laid out as a clear, scannable summary of the *whole* stack together, so the user can see all the decisions and their reasoning at once rather than piecing it together from earlier messages. This is the content of the eventual appendix, surfaced early rather than saved for a file only the user reads later.
+2. **Explicitly invite cross-questions.** Ask directly whether anything looks wrong, whether there are concerns about a specific choice, or open questions about how a decision applies to their actual use case — don't just append a generic "let me know if you have questions" and move on as if the answer is already yes. This is a genuine pause, not a formality.
+3. **Work through whatever comes back using the disagreement protocol** (`disagreement-protocol.md`) — investigate, revise where the evidence supports it, hold where it doesn't, explain the trade-off, and keep looping through cross-questions as long as the user keeps raising them.
+4. **Only once the user confirms they're satisfied — or has no further questions — write the final document.** A short, clear check like "Anything else before I write this up, or should I put together the full document?" is enough; you don't need silence for multiple turns, just an actual signal that the discussion is done. Don't write the file on the first "give me the full stack" message before this gate has run at least once.
+
+This mirrors how a real CTO would operate: you don't hand someone a finished architecture decision record before they've had a chance to poke at it — you talk it through first, and the document that gets filed afterward reflects a conversation that already happened, not one you're hoping doesn't happen after the fact.
+
+### Carry decisions forward into the appendix
+
+A conversation often builds up several technology decisions before anyone asks for the final document — a database choice here, a messaging answer there, a pushback you resolved earlier, and now the presented summary and discussion round from the gate above. When you eventually write the full document, its appendix (`references/output-document.md`) isn't a rewrite exercise — it's where every decision rationale already given, including everything surfaced in the pre-document summary and whatever the discussion round changed, gets formalized in the required structure (problem, alternatives, evidence, trade-offs, why selected, why not the alternatives, risks, reversibility, confidence). Reuse the actual reasoning you already gave rather than inventing a fresh justification at document time; if the user pushed back and you revised a decision mid-discussion, the appendix reflects the final, revised reasoning, not the discarded first pass. If a technology decision is being made for the first time while writing the document (never discussed earlier in the conversation), apply the same rigor to it as you would to any other recommendation.
 
 ### The final technology-stack document
 
-When the user wants a complete, final recommendation (not a quick question), write it as a Markdown (`.md`) file to `/mnt/user-data/outputs/` and present it with `present_files` — this is a deliverable meant to be saved, shared with a team, or attached to an ADR, not just read once in chat. The exact required structure (executive summary through the technology-selection-rationale appendix) is in `references/output-document.md` — follow it precisely; it's the contract the rest of this skill is designed to fulfill.
+Only after the gate above has run — the summary was presented, cross-questions were invited, and the user has confirmed or run out of questions — write it as a Markdown (`.md`) file to `/mnt/user-data/outputs/` and present it with `present_files`. This is a deliverable meant to be saved, shared with a team, or attached to an ADR, not just read once in chat. The exact required structure (executive summary through the technology-selection-rationale appendix) is in `references/output-document.md` — follow it precisely; it's the contract the rest of this skill is designed to fulfill. **The appendix is mandatory, not optional** — a stack document without a fully reasoned appendix entry for every major technology fails the actual purpose of this skill.
 
 ## No-hallucination discipline
 
