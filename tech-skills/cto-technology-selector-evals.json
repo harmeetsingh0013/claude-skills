@@ -1,0 +1,29 @@
+{
+  "skill_name": "cto-technology-selector",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're building a new internal tool for our 6-person team to track customer support tickets. Expecting maybe 50-100 tickets a day, nothing fancy. What tech stack should we use? We're mostly a Python and TypeScript shop, deploying on AWS already.",
+      "expected_output": "A lean interview (or straight to a scoped recommendation given the details already provided) that respects the low-stakes/small-scale framing, avoids over-engineering (no microservices/Kafka/K8s for this), leans on the team's existing Python/TS/AWS expertise, and gives a simple, justified recommendation rather than a maximal one. Should not demand an exhaustive interview for something this scoped.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I've attached our architecture-design.md and non-functional-requirements.md for a payments reconciliation system that needs to handle bank settlement files nightly and reconcile against our ledger. Can you review these and recommend the technology stack? We need strong consistency and full audit trails, and this can't lose data.",
+      "expected_output": "Inspects the supplied documents rather than skipping to assumptions, cross-checks them for contradictions/gaps, treats the strong-consistency and audit/no-data-loss requirements as first-class architectural drivers (e.g. transactional relational DB, durability/replication considerations, batch processing model for nightly files), verifies current facts about any recommended DB/tooling rather than asserting from memory, and offers to produce the full technology-stack document as a deliverable file.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "should we use kafka or just rabbitmq for our order processing system? we're doing maybe 200 orders/min peak, single region, need at-least-once delivery",
+      "expected_output": "Answers the specific question directly rather than launching a full stack analysis, applies the evaluation model (throughput/complexity/operational burden relative to the stated 200/min volume), pushes back gently on unnecessary complexity if Kafka is overkill at that volume, verifies current facts about either technology instead of asserting from memory, and gives a clear recommendation with the counterfactual (what would make the other choice correct).",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "We already picked Postgres and you're telling me to switch to a distributed database because of scale — but we're not even close to Postgres's limits yet. I don't buy it.",
+      "expected_output": "Follows the disagreement protocol: acknowledges the pushback, treats it as a legitimate factual/architectural concern, investigates/reasons about actual Postgres scaling limits and whether they apply here, doesn't argue to 'win', and either revises the recommendation to keep Postgres (likely, given the framing) or clearly justifies why distribution is still warranted — with the trade-off stated plainly either way, then concludes rather than relitigating.",
+      "files": []
+    }
+  ]
+}
