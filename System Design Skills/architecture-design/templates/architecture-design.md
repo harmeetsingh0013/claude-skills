@@ -37,9 +37,10 @@ contexts (see section 5), and each meaning gets its own row here.
 
 Identify the bounded contexts this system decomposes into. See
 `references/ddd-glossary.md` for the heuristics (capability groupings,
-differing NFR profiles, vocabulary splits, ownership boundaries). **Each
-bounded context here is what becomes a module for future implementation
-planning** — see section 35.
+differing NFR profiles, vocabulary splits, ownership boundaries). Each
+bounded context named here is a natural unit for future implementation
+planning, though breaking that down into modules/tasks is a separate
+skill's job, not this document's.
 
 ### BC-01: <name>
 **Responsibility:**
@@ -175,23 +176,7 @@ requirement that isn't addressed anywhere.
 
 ## 34. Future Evolution
 
-## 35. Module & Task Breakdown Map
-
-One row per bounded context (= module). This is the forward-looking
-deliverable for a future implementation task-breakdown — this skill
-defines clean module boundaries and their dependency order; it does not
-produce actual tickets, code, or implementation detail.
-
-| Module (Bounded Context) | Depends On | Suggested Task Granularity | MVP Alignment |
-|---------------------------|------------|------------------------------|-----------------|
-
-"Suggested Task Granularity" is a coarse category list (e.g. "schema/
-migration," "aggregate + domain logic," "application service," "API
-endpoint(s)," "event publisher/consumer") — categories a future
-task-breakdown step would expand into real tasks, not the tasks
-themselves.
-
-## 36. Mermaid Diagram Specification
+## 35. Mermaid Diagram Specification
 
 List each diagram mermaid-js should produce: name, type (one of
 system-context / container-architecture / request-flow / data-flow /

@@ -16,9 +16,9 @@ someone picked the wrong word.
 
 **Bounded Context** — an explicit boundary within which a particular
 domain model (and its ubiquitous language) applies consistently. This is
-the primary strategic design tool, and in this pipeline, **a bounded
-context is what becomes a module** — the unit a future implementation
-task-breakdown works from. Heuristics for finding boundaries:
+the primary strategic design tool, and it's naturally the unit a
+module/task-breakdown skill would work from later, though producing that
+breakdown isn't this skill's job. Heuristics for finding boundaries:
 - A capability grouping in the FR document (its `### <Capability>`
   headings) is often already a good starting hint.
 - Different NFR profiles are a strong signal — if one area needs strict
@@ -96,6 +96,5 @@ state aggregate invariants in prose, and name domain events — this is
 design, and it's this skill's job. Writing actual class definitions,
 method signatures, interface code, or database DDL is implementation —
 that's out of scope here, same as it's out of scope for every other stage
-of this pipeline. A future task-breakdown step (outside this pipeline)
-is what turns a well-defined module boundary into actual work items and
-code.
+of this pipeline. Breaking a bounded context down into modules or actual
+work items is a separate skill's job, not this one's.

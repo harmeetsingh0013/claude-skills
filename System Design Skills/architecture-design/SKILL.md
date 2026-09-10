@@ -1,6 +1,6 @@
 ---
 name: architecture-design
-description: Produces a versioned system-design/architecture document using a Domain-Driven Design approach — ubiquitous language, bounded contexts, context mapping, and tactical design (aggregates, entities, domain events) — plus components, data architecture, APIs, ADRs, security, scalability, resilience, a module/task breakdown map, and Mermaid diagram specifications. Stage 3 of a five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js), built from FR and NFR documents. Use for system architecture, technical design, ADRs, domain modeling, bounded contexts, or technology/component decisions for a product with FR/NFR documents, or to run/update the "architecture design" stage. Also use when re-invoked by design-pipeline-orchestrator. The one pipeline stage that makes technology and domain-modeling decisions — but never produces implementation code itself.
+description: Produces a versioned system-design/architecture document using a Domain-Driven Design approach — ubiquitous language, bounded contexts, context mapping, and tactical design (aggregates, entities, domain events) — plus components, data architecture, APIs, ADRs, security, scalability, resilience, and Mermaid diagram specifications. Stage 3 of a five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js), built from FR and NFR documents. Use for system architecture, technical design, ADRs, domain modeling, bounded contexts, or technology/component decisions for a product with FR/NFR documents, or to run/update the "architecture design" stage. Also use when re-invoked by design-pipeline-orchestrator. The one pipeline stage that makes technology and domain-modeling decisions — but never produces implementation code itself. Does not produce a module/task breakdown — that's a separate skill.
 ---
 
 # Architecture Design
@@ -19,10 +19,10 @@ start of a session if you haven't already.
 **You design; you don't implement.** Bounded contexts, aggregates, domain
 events, and components are described in prose and structured data —
 never as class definitions, method signatures, interface code, or
-database DDL. The output of this skill is meant to become the input to a
-future implementation task-breakdown (see the Module & Task Breakdown Map
-below); writing the implementation yourself would pre-empt that step, not
-help it.
+database DDL. This document's bounded contexts are meant to become the
+input to a separate module/task-breakdown skill later; writing the
+implementation yourself, or breaking work into tasks yourself, would
+pre-empt that step, not help it.
 
 ## Step 1: Get the project ID
 
@@ -173,10 +173,11 @@ more than one bounded context.
 **2. Bounded Contexts (strategic design).** Partition the system using
 the FR document's capability groupings, differing NFR profiles (a
 strict-consistency/low-latency area vs. an eventually-consistent one is a
-strong hint), vocabulary splits, and natural ownership boundaries. Every
-bounded context you name here **is a module** — this is the structure a
-future implementation task-breakdown will work from, so favor a small
-number of clearly-scoped contexts over many overlapping ones.
+strong hint), vocabulary splits, and natural ownership boundaries. Each
+bounded context is naturally a unit a future module/task-breakdown skill
+would work from, so favor a small number of clearly-scoped contexts over
+many overlapping ones — but breaking that down into modules or tasks is
+that separate skill's job, not something you produce here.
 
 **3. Context Map (strategic design).** For every pair of bounded contexts
 that interact, name the relationship using one of the DDD context-mapping
@@ -218,35 +219,31 @@ revisit intelligently when a requirement changes later.
 
 ## What belongs in this document
 
-Fill in `templates/architecture-design.md` exactly — it has 36 numbered
+Fill in `templates/architecture-design.md` exactly — it has 35 numbered
 sections plus an MVP Scope note and a Completeness Assessment; don't drop
 or reorder them, even if a section ends up brief. Use
 `references/ddd-glossary.md` for DDD terminology and patterns,
 `references/adr-format.md` for each ADR entry, and
 `references/architecture-reasoning.md` for the driver chain. See
 `examples/url-shortener-architecture.md` for a fully worked excerpt
-(including the DDD sections and the Module & Task Breakdown Map) plus its
-matching `data.json`.
+(including the DDD sections) plus its matching `data.json`.
 
-Section 35 (Module & Task Breakdown Map) is the explicit forward-looking
-deliverable: one row per bounded context, its dependencies on other
-bounded contexts, and a coarse category list of what a future
-implementation effort would need to do — not actual tickets or code, just
-clean boundaries and dependency order for a future task-breakdown step to
-work from.
-
-Section 36 (Mermaid Diagram Specification) is where you tell `mermaid-js`
+Section 35 (Mermaid Diagram Specification) is where you tell `mermaid-js`
 what to produce: name, type, and what each diagram must show. List only
 the diagrams this specific design actually warrants — not one of every
 type by default, and not diagrams for deferred, not-yet-in-scope work. A
 `context-map` diagram is usually worth including once you have more than
 one bounded context.
 
+This document does not include a module or task breakdown — bounded
+contexts are a natural starting point for one, but producing it is a
+separate skill's job, not this one's.
+
 Alongside the `.md`, produce a `.data.json` following
 `schema/architecture-design.schema.json` — ubiquitous language, bounded
-contexts, the context map, domain events, ADRs, components, the module
-breakdown, diagram specifications, and traceability all need structured
-entries, not just prose. This is the contract `mermaid-js` will read.
+contexts, the context map, domain events, ADRs, components, diagram
+specifications, and traceability all need structured entries, not just
+prose. This is the contract `mermaid-js` will read.
 
 ## No hallucination
 

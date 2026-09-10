@@ -117,23 +117,6 @@ processing) latency before a click appears in reports — acceptable since
 no NFR requires real-time analytics.
 ```
 
-## Excerpt: Section 35 (Module & Task Breakdown Map)
-
-```markdown
-## 35. Module & Task Breakdown Map
-
-| Module (Bounded Context) | Depends On | Suggested Task Granularity | MVP Alignment |
-|---------------------------|------------|------------------------------|-----------------|
-| BC-03 Team & Access | (none) | schema/migration; aggregate + domain logic; application service; API endpoint(s) | 1 |
-| BC-01 Link Management | BC-03 | schema/migration; aggregate + domain logic; application service; API endpoint(s); event publisher | 1 |
-| BC-02 Analytics | BC-01 | schema/migration; aggregate + domain logic; event consumer; API endpoint(s) for reporting | 1 |
-
-Team & Access has no dependencies, so it's the natural place for a future
-implementation effort to start — this table doesn't sequence the work
-itself, but the dependency column is what a task-breakdown step would use
-to do that.
-```
-
 ## The matching data.json (excerpt)
 
 ```json
@@ -196,11 +179,6 @@ to do that.
     {"name": "Redirect Service", "responsibility": "Resolves short codes and returns redirects; publishes click events without waiting on them.", "bounded_context": "BC-01"},
     {"name": "Click Consumer", "responsibility": "Reads click events off the queue and writes them to durable storage.", "bounded_context": "BC-02"}
   ],
-  "module_breakdown": [
-    {"module_id": "BC-03", "depends_on": [], "suggested_task_granularity": ["schema/migration", "aggregate + domain logic", "application service", "API endpoint(s)"], "mvp_alignment": 1},
-    {"module_id": "BC-01", "depends_on": ["BC-03"], "suggested_task_granularity": ["schema/migration", "aggregate + domain logic", "application service", "API endpoint(s)", "event publisher"], "mvp_alignment": 1},
-    {"module_id": "BC-02", "depends_on": ["BC-01"], "suggested_task_granularity": ["schema/migration", "aggregate + domain logic", "event consumer", "API endpoint(s) for reporting"], "mvp_alignment": 1}
-  ],
   "diagram_specifications": [
     {
       "name": "context-map",
@@ -231,7 +209,6 @@ to do that.
 
 Notice the bounded contexts (BC-01/02/03) are the load-bearing structure
 here: they show up in the strategic design sections, the tactical design,
-the component architecture, the ADR, and finally the Module & Task
-Breakdown Map. That's deliberate — a bounded context identified in section
-5 should be traceable all the way through to a row in section 35, not
-introduced once and forgotten.
+the component architecture, and the ADR. That's deliberate — a bounded
+context identified in section 5 should be traceable all the way through
+the document, not introduced once and forgotten.
