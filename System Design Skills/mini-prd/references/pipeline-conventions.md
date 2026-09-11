@@ -278,10 +278,20 @@ Field notes:
 
 | Document's own "Completeness Assessment" | Envelope `status` |
 |---|---|
-| `READY_FOR_NFR` / `READY_FOR_ARCHITECTURE` / `READY_FOR_MERMAID` / `READY` (mermaid-diagrams) | `READY` |
-| `BLOCKED` (with blocking issues listed) | `BLOCKED_QUESTION` |
-| `CONFLICT` (architecture-design only, from a Section 3 contradiction) | `CONFLICT` |
+| `READY_FOR_NFR` / `READY` (mermaid-diagrams) | `READY` |
+| `READY_FOR_IMPLEMENTATION_PLANNING` / `READY_WITH_ASSUMPTIONS` (architecture-design only) | `READY` |
+| `BLOCKED` (mini-prd, functional-requirements, non-functional-requirements — with blocking issues listed) | `BLOCKED_QUESTION` |
+| `BLOCKED` (architecture-design only — per its own definition, this specifically means an unresolved material contradiction, not just missing information; see architecture-design's own SKILL.md) | `CONFLICT` |
 | A run that failed before producing a real document at all (e.g. an unreadable input) | `ERROR` |
+
+Note architecture-design's status names differ from every other stage's
+(`READY_FOR_IMPLEMENTATION_PLANNING` / `READY_WITH_ASSUMPTIONS` / `BLOCKED`
+instead of `READY_FOR_<NEXT_STAGE>` / `BLOCKED`) — this is deliberate,
+matching the architecture profession's own terminology rather than
+forcing every stage into identical naming. `READY_WITH_ASSUMPTIONS` is
+architecture-design's normal, common outcome, not a degraded one — most
+real architectures proceed with some explicit assumptions rather than
+none.
 
 ## Reading inputs (every skill except mini-prd)
 

@@ -1,45 +1,53 @@
 # Design Pipeline Skills
 
-Five Claude Code skills that turn a product idea into a fully specified,
-diagrammed system design — each stage gated on the previous one being
-genuinely complete, not just present, and built up in small MVP-sized
-batches rather than all at once (see section 4).
+Seven Claude Code skills that turn a raw problem description into a fully
+specified, diagrammed system design — and, on request, into a
+deterministic implementation task plan. Each design stage is gated on the
+previous one being genuinely complete, not just present, and built up in
+small MVP-sized batches rather than all at once (see section 4).
 
 ```
-functional-requirements → non-functional-requirements → architecture-design → mermaid-js
-                    (coordinated by design-pipeline-orchestrator)
+mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js
+                              (coordinated by design-pipeline-orchestrator)
+                                                    │
+                                                    ▼
+                                          sprint-planning (on request)
 ```
 
 | Skill | What it produces | Consumes |
 |---|---|---|
-| `functional-requirements` | Functional Requirements Document — what the product must do | A product idea |
-| `non-functional-requirements` | Non-Functional Requirements Document — performance, scale, security, etc. | The FR document |
+| `mini-prd` | Mini-PRD — problem statement, goals, MVP scope, user journeys, high-level product requirements | A raw problem/idea description (via interview) |
+| `functional-requirements` | Functional Requirements Document — what the product must do | The Mini-PRD |
+| `non-functional-requirements` | Non-Functional Requirements Document — performance, scale, security, etc. | The FR document (+ the Mini-PRD's workload assumptions) |
 | `architecture-design` | System Architecture & Design Document — components, data model, ADRs, tech choices | The FR + NFR documents |
 | `mermaid-js` | A set of `.mmd` diagram files | The architecture document's diagram specifications |
-| `design-pipeline-orchestrator` | Nothing of its own — decides which of the above need to (re)run | All of the above |
+| `sprint-planning` | A Sprint document — up to 10 implementation tasks with prerequisites, execution mode, and blocking relationships | The FR + NFR + architecture documents |
+| `design-pipeline-orchestrator` | Nothing of its own — decides which design stages need to (re)run | All of the design stages |
 
 ---
 
 ## 1. Install
 
 Each skill ships as a `.skill` file, which is a zip archive of a skill
-folder. Unzip all five into the same location:
+folder. Unzip all seven into the same location:
 
 ```bash
 # Personal — available in every project on this machine
 mkdir -p ~/.claude/skills
+unzip mini-prd.skill -d ~/.claude/skills/
 unzip functional-requirements.skill -d ~/.claude/skills/
 unzip non-functional-requirements.skill -d ~/.claude/skills/
 unzip architecture-design.skill -d ~/.claude/skills/
 unzip mermaid-js.skill -d ~/.claude/skills/
+unzip sprint-planning.skill -d ~/.claude/skills/
 unzip design-pipeline-orchestrator.skill -d ~/.claude/skills/
 ```
 
 or into a single project's `.claude/skills/` instead of `~/.claude/skills/`
-if you only want them there. Keep all five together in the same location —
+if you only want them there. Keep all seven together in the same location —
 they refer to each other by name.
 
-Verify with `/skills` in a Claude Code session. You should see all five
+Verify with `/skills` in a Claude Code session. You should see all seven
 listed.
 
 ---
@@ -87,9 +95,13 @@ later rather than starting over.
 
 - **New project:** don't have an ID? Just start talking — the first skill
   you invoke (usually the orchestrator) will ask "new or existing, and if
-  new, what should I call it?" A short name (e.g. "url-shortener") becomes
-  part of the folder name; the unique ID it mints alongside that is what
-  you'll actually use to resume. **Save the ID** — the name alone won't be
+  new, what should I call it, and where would you like the documents
+  saved?" **The location is something you're asked, not something decided
+  for you, and there's no hardcoded fallback path** — say a path, or just
+  say "use the default" and it'll create the project right in the current
+  working directory. A short name (e.g. "url-shortener") becomes part of
+  the folder name; the unique ID it mints alongside that is what you'll
+  actually use to resume. **Save the ID** — the name alone won't be
   enough to resume, since it's not guaranteed unique on its own.
 - **Existing project:** give it your ID. The skill confirms it exists,
   then checks what — if anything — actually needs to be regenerated.
@@ -107,38 +119,54 @@ regenerates what actually changed, cascading downstream automatically —
 you don't need to remember to re-run everything by hand.
 
 All of this lives on disk in a dedicated project folder — **not** inside
-this skill's installation directory, and **not** relative to wherever
-Claude Code happens to be running:
+this skill's installation directory, and never silently nested inside a
+generic subfolder. Where exactly depends on what you said when the
+project was created:
 
-| OS | Location |
-|---|---|
-| macOS / Linux | `$HOME/<project-name>-<unique-id>/` |
-| Windows | `C:\<project-name>-<unique-id>\` |
+- **You gave a location** → the project folder is created there, e.g.
+  `~/my-projects/url-shortener-curious-mango/`.
+- **You said "use the default"** (or didn't have a preference) → created
+  right in the current working directory — wherever the skill happens to
+  be running from, e.g. `./url-shortener-curious-mango/` inside whatever
+  repo or folder you're already working in, similar to how a `.git`
+  folder works.
 
-e.g. `/home/alex/url-shortener-curious-mango/` or
-`C:\url-shortener-curious-mango\`. Inside that folder:
+Inside that folder:
 
 ```
 <project-root>/
   product-idea/
+  mini-prd/
   functional-requirements/
   non-functional-requirements/
   architecture-design/
   mermaid-diagrams/
 ```
 
-A small registry at `<home-or-C:\>/.design-pipeline/projects.json` maps
-each project's unique ID to this folder, which is how `list-projects` and
-resuming by ID work without scanning your whole home directory. If the
-default location isn't writable in your environment, set the
-`DESIGN_PIPELINE_HOME` environment variable to redirect it.
+A small registry (`.design-pipeline/projects.json`) tracks every
+project's unique ID and where its folder actually is — this is what
+`list-projects` and resuming by ID read from. **It follows the same rule
+as the project folders themselves**: if a project was created with an
+explicit location, its registry entry is still recorded relative to
+wherever the skill was run *from* at creation time, and if it was created
+with no location (cwd fallback), the registry itself is also local to
+that working directory. Practically, this means **a project created with
+no explicit location is only discoverable from the same working
+directory it was created in** — if `list-projects` or `--project <id>`
+comes back empty/not-found and you're confident the ID is right, the
+first thing to check is whether you're in a different working directory
+than when the project was created, not whether the project was lost.
 
 ---
 
 ## 4. MVP-sized iterations
 
 The pipeline doesn't try to fully specify a product in one pass. Each
-round produces a small, reviewable batch instead of everything at once:
+round produces a small, reviewable batch instead of everything at once.
+**mini-prd sits outside this — it's a single upfront document, not
+produced in batches** (its own "MVP Scope" section, In Scope/Out of
+Scope, is what seeds the *first* functional-requirements batch, not a
+progression of its own):
 
 - **functional-requirements** picks the ~10 most important requirements
   for this round (a hard ceiling of 12 is schema-enforced — a batch
@@ -183,19 +211,29 @@ start the next MVP — you don't have to remember to ask.
 
 ## 5. What each skill does
 
-### `design-pipeline-orchestrator`
-Doesn't write anything itself. Resolves the project ID, computes a `plan`
-(which stages are stale vs. up to date vs. blocked on something upstream),
-and runs the stages that need it, in order, stopping and reporting clearly
-if one comes back blocked or in conflict. **Use this by default** — invoke
-an individual stage directly only when you know exactly one stage needs to
-run and there's no ambiguity about staleness.
+### `mini-prd` (stage 0)
+Turns a raw problem/idea description into a Mini-PRD through an active
+interview — not a form to fill in silently. Asks one focused question at
+a time, following the template's section order (problem statement →
+actors → goals → success criteria → MVP scope → user journeys → product
+requirements → business rules → analytics → assumptions → constraints →
+open questions), and when an answer opens a dependent question, follows
+that thread to resolution before moving to the next topic rather than
+jumping around. Stays strictly architecture-neutral — it will redirect a
+user who starts naming databases or frameworks back toward the underlying
+need, and never itself suggests one. Produces the product-level document
+every other stage is ultimately grounded in: its In Scope/Out of Scope
+split seeds functional-requirements' first batch and backlog, and its
+workload assumptions feed non-functional-requirements' capacity targets.
 
 ### `functional-requirements` (stage 1)
-Turns a product idea into a Functional Requirements Document: actors,
+Turns a Mini-PRD into a Functional Requirements Document: actors,
 scope, and a numbered list of testable requirements (`FR-001`, `FR-002`,
 ...), each with preconditions, main flow, failure behavior, and
-dependencies. Strictly scoped to *what* the system does — it will not name
+dependencies. Its first batch is seeded from the Mini-PRD's In Scope list
+and `PR-NNN` product requirements (each `FR-NNN` records which `PR-NNN`
+it elaborates); the Out of Scope list seeds the backlog immediately.
+Strictly scoped to *what* the system does — it will not name
 a database, an API shape, or a cloud service; those are scope creep at
 this stage and are pushed to architecture-design instead.
 
@@ -210,58 +248,126 @@ it. Also technology-agnostic: an NFR says "99.999999999% durability," never
 The one stage allowed to make real decisions — databases, queues, APIs,
 cloud services. Requires *both* FR and NFR documents, cross-checks them for
 contradictions before designing anything (e.g. an FR implying 10M users
-against an NFR capped at 100 concurrent users triggers a `CONFLICT` report
-instead of a guess), and requires every consequential decision to follow a
-visible chain: **requirement → architectural driver → decision → technology
-evaluation → technology choice** — never a straight jump to a technology
-name.
+against an NFR capped at 100 concurrent users triggers a hard-blocking
+`BLOCKED` status instead of a guess), and requires every consequential
+decision to follow a visible chain: **requirement → architectural driver →
+decision → technology evaluation → technology choice** — never a straight
+jump to a technology name.
 
-It uses a **Domain-Driven Design** approach: pull a shared **ubiquitous
-language** from the FR/NFR vocabulary, partition the system into
-**bounded contexts** (using capability groupings, differing NFR profiles,
-and vocabulary splits as the signals), map how those contexts relate
-(Partnership, Shared Kernel, Customer-Supplier, Conformist,
-Anticorruption Layer, Open Host Service, Published Language, or Separate
-Ways — always named, never left implicit), then work out each context's
-**aggregates, entities, and domain events** before making any technology
-choice. Every bounded context doubles as a **module** — the document ends
-with a Module & Task Breakdown Map (dependencies + coarse task categories
-per module) meant to feed a future implementation planning step. This
-skill designs; it never writes implementation code, class definitions, or
-DDL — that's explicitly out of scope even here.
+Operates like a principal architect (techniques from Fowler, Booch,
+Kleppmann, and Richards & Ford — applied as engineering discipline, never
+as a voice to imitate): **depth adapts to actual complexity and risk, not
+a fixed checklist** — a simple system gets a short, honest document with
+sections explicitly marked "Not Applicable" where padding would otherwise
+go; a genuinely complex distributed system gets real depth where the
+complexity actually is. Every statement is kept classified as a
+Requirement, a Derived fact, an Assumption, a Decision, or an Unknown —
+never blurred together — and the document ends in exactly one of three
+states: `READY_FOR_IMPLEMENTATION_PLANNING`, `READY_WITH_ASSUMPTIONS`
+(the common, non-degraded case), or `BLOCKED`. This skill designs; it
+never writes implementation code, breaks work into modules or tasks
+(that's `sprint-planning`), and — deliberately — **never produces
+diagrams or diagram specifications at all**; that's entirely `mermaid-js`'s
+job now, working from this document's content directly.
 
-Produces the full design document plus Architecture Decision Records
-(ADRs) and a specification of exactly which diagrams are needed.
+Produces the full design document plus concise Architecture Decision
+Records (Context / Decision / Alternatives / Trade-offs).
 
 ### `mermaid-js` (stage 4)
-Pure extraction, not design. Reads the architecture document's diagram
-specifications and produces one `.mmd` file per requested diagram —
-nothing more, nothing invented (including a `context-map` diagram type,
-approximated as a labeled flowchart since Mermaid has no native context-map
-diagram). Looks for a Mermaid MCP tool first; falls
-back to hand-written Mermaid syntax if none is available, and honestly
-reports which diagrams were tool-validated versus only manually reviewed.
+Pure extraction, not design — and not a checklist either. There's no
+diagram spec to read anymore: this skill reads architecture-design's
+actual content (System Context, Component Architecture, Request Flows,
+Data Model, Deployment Architecture) and decides for itself which
+diagrams that content actually warrants, skipping any type a section
+doesn't support (a "Not Applicable" caching section produces no caching
+diagram). Looks for a Mermaid MCP tool first; falls back to hand-written
+Mermaid syntax if none is available, and honestly reports which diagrams
+were tool-validated versus only manually reviewed — and *why* a diagram
+type was skipped, not just that it was.
+
+### `sprint-planning` (on request, not a numbered pipeline stage)
+Turns a completed design (FR + NFR + architecture-design all `READY`)
+into implementation tasks — up to 10 per sprint, each with explicit
+prerequisites, execution mode, and blocking relationships, plus a tracked
+`NOT_READY → READY → IN_PROGRESS → DONE` lifecycle. Invoked independently
+per sprint, not chained automatically. See section 6 for the full model.
+
+### `design-pipeline-orchestrator`
+Coordinates the five design stages above (not `sprint-planning`, which it
+can point you to but doesn't chain into automatically). Resolves the
+project ID, computes a `plan`, and runs whatever's stale, in order,
+stopping and reporting clearly if something comes back blocked or in
+conflict. **Use this by default** for the design stages — invoke an
+individual one directly only when you know exactly which one needs to run.
 
 ---
 
-## 6. Typical usage
+## 6. sprint-planning: deterministic task orchestration
+
+Once FR, NFR, and architecture-design are all `READY`, `sprint-planning`
+turns the design into implementation work — but it's a **deterministic
+task orchestrator, not a text generator**. It's invoked independently, on
+request, once per sprint; it is not part of the automatic
+design-pipeline-orchestrator cascade, because a new sprint should start
+when the previous one's work actually finished, not when a document
+upstream changed hash.
+
+**Three separate facts per task, never collapsed into "parallel vs.
+sequential":**
+1. **Prerequisites** — what must already be `DONE` before this task can start.
+2. **Execution mode** — once prerequisites are met, can it run alongside
+   other tasks, or must it wait for something specific? ("Parallel" never
+   means "can start immediately regardless of prerequisites.")
+3. **Blocks** — which later tasks are waiting on this one.
+
+**Foundation First.** Project structure, shared interfaces, core domain
+types, and test/build infrastructure aren't a task category — they're what
+makes every other task's scope even well-defined. Feature work stays
+`NOT_READY`, not "parallel," until the foundation it silently depends on
+is actually `DONE`.
+
+**A real, tracked lifecycle**, separate from the sprint document itself
+(so marking progress doesn't churn a version bump every time):
+```
+NOT READY → READY → IN PROGRESS → DONE
+```
+`task-status-init` seeds every task's starting status from its
+prerequisites (checked across *every* sprint, not just the current one).
+`task-status-set ... --status DONE` automatically cascades — any task
+anywhere whose prerequisites just became fully satisfied flips from
+`NOT_READY` to `READY` without you having to compute that by hand.
+
+**Capped and cumulative, like the design stages.** A sprint contains at
+most 10 tasks (schema-enforced, not just a suggestion) and task IDs number
+continuously across sprints — Sprint 2 continues from Sprint 1's highest
+`TASK-NNN`, never restarting. If more work remains than fits in one
+sprint, the document says so explicitly rather than compressing the rest
+in to fit.
+
+---
+
+## 7. Typical usage
 
 **Starting a brand-new product:**
 > "I want to build a URL shortener for small teams with click analytics.
 > Run it through the design pipeline."
 
-The orchestrator will ask if this is new, mint a project ID, and run all
-four stages in order (pausing if any stage comes back `BLOCKED` with
+The orchestrator will ask if this is new, mint a project ID, and start
+with `mini-prd` — a real interview about the problem, actors, goals, and
+MVP scope, one question at a time — before running the remaining four
+stages in order (pausing if any stage comes back `BLOCKED` with
 questions it needs answered, or reports a conflict between FR and NFR).
 
 **Resuming and making a change:**
 > "Project curious-mango — we need to support file uploads now too."
 
-The orchestrator confirms the project exists, updates the product idea,
-and re-plans: functional-requirements reruns (new FR), which cascades to
-non-functional-requirements, architecture-design, and mermaid-js
-automatically — each producing a new version, with unaffected content
-carried forward rather than regenerated from scratch.
+The orchestrator confirms the project exists and asks whether this is a
+Mini-PRD-level change (a new capability the product brief didn't cover)
+or a smaller edit to an existing FR/NFR document. For a Mini-PRD-level
+change, mini-prd revises first, which cascades all the way down:
+functional-requirements reruns, then non-functional-requirements,
+architecture-design, and mermaid-js — each producing a new version, with
+unaffected content carried forward rather than regenerated from scratch.
 
 **Just checking status:**
 > "What's the status of curious-mango?"
@@ -271,7 +377,7 @@ anything's stale.
 
 ---
 
-## 7. If something stops
+## 8. If something stops
 
 - **`BLOCKED`** — a stage couldn't derive something and needs a specific
   question answered (listed explicitly). Answer it and re-run that stage.

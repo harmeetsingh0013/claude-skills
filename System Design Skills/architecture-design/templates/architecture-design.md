@@ -1,222 +1,245 @@
 # System Architecture & Design Document
 
+> **Adaptive depth, not a form to fill mechanically.** The section list below
+> is canonical — don't drop or reorder sections — but depth is not. A
+> section should be detailed when architecturally important, concise when
+> moderately relevant, and marked **"Not Applicable"** (with a one-line
+> reason) when genuinely irrelevant to this system. Never pad a section
+> with generic theory just to make the document look complete. A simple
+> system should produce a simple, concise document; a complex distributed
+> system warrants deeper analysis where the complexity actually is.
+
+Architecture Status: READY_FOR_IMPLEMENTATION_PLANNING / READY_WITH_ASSUMPTIONS / BLOCKED
+
+Document Version: [X.Y]
+
+---
+
 ## 1. Executive Summary
+
+Purpose, business context, proposed architecture, major architectural
+characteristics, major decisions, major risks, architecture status.
 
 ## 2. Input Documents
 
 ### Functional Requirements
-Version:
-Validation: PASS/FAIL
+Version: | Validation: PASS/FAIL
 
 ### Non-Functional Requirements
-Version:
-Validation: PASS/FAIL
+Version: | Validation: PASS/FAIL
+
+### Other Inputs
+(Mini-PRD constraints, existing-system context, etc. — only if relevant)
 
 ## 3. Requirements Validation
 
+### Requirement Integrity
+### Cross-Document Validation
 ### Conflicts
-Contradictions found between the FR and NFR documents. If any exist, this
-document's Completeness Assessment status must be CONFLICT, not
-READY_FOR_MERMAID — see references/pipeline-conventions.md.
+Use the hard-blocking format (see SKILL.md) for any material, unresolved
+contradiction. If none: "No material conflicts identified."
 
 ### Missing Information
 ### Assumptions
+Each assumption: statement, classification (ASSUMPTION / DERIVED /
+UNKNOWN), architectural impact, and what would change if it's wrong.
 
-## 4. Ubiquitous Language
+### Architecture Status
+READY_FOR_IMPLEMENTATION_PLANNING / READY_WITH_ASSUMPTIONS / BLOCKED
 
-Table: Term | Definition | Bounded Context (if the term is specific to
-one). Draw terms from the FR/NFR documents' own vocabulary — don't invent
-new names for things they already named. If the same word means different
-things in different areas, that's usually a sign of separate bounded
-contexts (see section 5), and each meaning gets its own row here.
+## 4. Architectural Drivers
 
-| Term | Definition | Bounded Context |
-|------|------------|------------------|
+Ranked list — business importance, architectural impact, difficulty of
+changing later. Not every NFR is equally important; rank them.
 
-## 5. Bounded Contexts (Strategic Design)
+## 5. System Context
 
-Identify the bounded contexts this system decomposes into. See
-`references/ddd-glossary.md` for the heuristics (capability groupings,
-differing NFR profiles, vocabulary splits, ownership boundaries). Each
-bounded context named here is a natural unit for future implementation
-planning, though breaking that down into modules/tasks is a separate
-skill's job, not this document's.
+External actors, external dependencies, system boundary. Text/structured
+description is fine — no diagram is produced at this stage (see note
+below).
 
-### BC-01: <name>
-**Responsibility:**
-**Core aggregates:** (named here, detailed in section 8)
-**Related requirements:** FR-N, NFR-N, ...
+## 6. Architecture Overview
 
-### BC-02: <name>
-...
+Architectural style in plain terms, logical structure, why this shape
+fits the drivers above. Domain/component boundaries can be described here
+based on business capability, ownership, consistency needs, change
+patterns — without requiring a full separate domain-modeling exercise
+unless the system's complexity actually warrants one.
 
-## 6. Context Map (Strategic Design)
+## 7. Architecture Alternatives
 
-Every relationship between two bounded contexts, using one of the
-patterns in `references/ddd-glossary.md` (Partnership, Shared Kernel,
-Customer-Supplier, Conformist, Anticorruption Layer, Open Host Service,
-Published Language, Separate Ways) — never leave a relationship unlabeled.
+Only when more than one style was genuinely viable. Each alternative:
+advantages, disadvantages, assessment (selected/rejected and why). Skip
+or keep brief if the choice was clear-cut.
 
-| From | To | Relationship | Rationale |
-|------|-----|--------------|-----------|
+## 8. Architecture Decisions
 
-## 7. Architectural Drivers
+### ADR-001 — [Decision Title]
+Status: | Context: | Decision: | Alternatives: | Trade-offs:
 
-The FRs/NFRs that most shape this design, and the driver they produce.
-Use the FR+NFR -> driver -> decision -> technology-evaluation ->
-technology-decision chain (see references/architecture-reasoning.md) —
-don't jump straight from a requirement to a named technology. Note which
-architectural drivers directly motivated a bounded context split in
-section 5 (e.g. an NFR forcing a consistency/availability split is
-usually also the reason two things became separate contexts, not just
-separate technologies).
+(repeat per significant decision — see references/adr-format.md. Don't
+write an ADR for every implementation detail.)
 
-## 8. Tactical Design
+## 9. Component / Service Architecture
 
-Per bounded context: its aggregates (aggregate root, the entities/value
-objects it contains, and its invariants — what must always hold true
-after a transaction), and the domain events it publishes or consumes.
-Prose descriptions only — no class definitions, method signatures, or
-code; see `references/ddd-glossary.md` for what belongs here vs. what's
+Per component/service: responsibility, owned data, key dependencies.
+Avoid creating components merely to make the document look sophisticated.
+
+## 10. Request Flows
+
+The most architecturally significant flows only — described as ordered
+steps or a sequence in text. Not every possible flow needs one.
+
+## 11. Data Architecture
+
+Data ownership, authoritative sources, persistence model, replication,
+retention — as relevant.
+
+## 12. Data Model
+
+Key entities/tables and their important fields/constraints, at the level
+that clarifies ownership and consistency — not a full schema unless
+warranted.
+
+## 13. API Design
+
+Only where architecturally relevant: interface responsibility, major
+resources/operations, request/response semantics, authn/authz,
+idempotency, versioning, error model. Focus on contracts, not
 implementation.
 
-### BC-01: <name>
+## 14. Caching Architecture
 
-**Aggregate: <name>**
-- Aggregate root:
-- Entities:
-- Value objects:
-- Invariants:
+What's cached, why, invalidation, failure behavior — or "Not Applicable"
+if the system doesn't need caching.
 
-**Domain events published:**
-- `<EventName>` — when it fires, what it carries, who's known to consume it
+## 15. Messaging / Event Architecture
 
-**Domain events consumed:**
-- `<EventName>` from BC-0N — how this context reacts to it
+Events/commands, delivery semantics, ordering, idempotency — or "Not
+Applicable" if the system is fully synchronous.
 
-### BC-02: <name>
-...
+## 16. Consistency & Concurrency
 
-## 9. Architecture Decisions
+Where strong consistency is required and why; where eventual consistency
+is acceptable and why. Concurrency handling for anything with real
+contention risk.
 
-### ADR-001
-### ADR-002
-...
-(see references/adr-format.md for the format of each entry; reference the
-bounded context(s) an ADR affects where relevant)
+## 17. Security Architecture
 
-## 10. Component / Service Architecture
+Proportional to risk: authn, authz, trust boundaries, data protection,
+abuse prevention — the parts that actually matter for this system, not a
+generic checklist.
 
-State explicitly whether each component maps 1:1 to a bounded context, or
-whether multiple contexts are pragmatically combined into one deployable
-component (and why — e.g. low individual traffic doesn't justify separate
-services yet). A component silently crossing bounded-context lines without
-a stated reason is worth a second look.
+## 18. Scalability Architecture
 
-## 11. Request Flows
+Only with real analysis if scale materially affects the architecture;
+otherwise state the scaling mechanism qualitatively (e.g. "stateless,
+scales horizontally; exact capacity requires load testing once workload
+targets are known").
 
-## 12. Data Architecture
+## 19. Availability Architecture
 
-Note where a bounded context owns its own data store vs. shares one, and
-why — sharing storage across bounded contexts is usually a sign of a
-Shared Kernel relationship (see section 6) and should be named as such.
+Redundancy and failure-domain reasoning proportional to the stated
+availability target (if any).
 
-## 13. Data Model
+## 20. Reliability & Resilience
 
-## 14. API Design
+Timeouts, retries, circuit breaking, graceful degradation — where a
+dependency failure actually needs a defined behavior.
 
-## 15. Caching Architecture
+## 21. Disaster Recovery
 
-## 16. Messaging / Event Architecture
+RTO/RPO if known; explicitly UNKNOWN if not, with what's needed to define
+them.
 
-Should directly implement the domain events named in section 8 and the
-Published Language / Open Host Service relationships named in section 6
-— this section is where those become a concrete technology choice.
+## 22. Observability
 
-## 17. Consistency & Concurrency
+What must be logged/measured/traced/alerted — the parts that matter for
+this system's actual failure modes and business questions, not a generic
+observability checklist.
 
-State the consistency boundary explicitly in terms of aggregates (section
-8): strong consistency within an aggregate, eventual consistency across
-aggregates and across bounded contexts, coordinated via domain events.
+## 23. Deployment Architecture
 
-## 18. Security Architecture
+Runtime, redundancy/zone strategy, deployment approach — as relevant to
+the availability/scale drivers.
 
-## 19. Scalability Architecture
+## 24. Technology Selection
 
-## 20. Availability Architecture
+Only for choices that materially matter. Fit, trade-offs, alternatives.
+Verify current external facts (capabilities, limits) rather than
+asserting them from memory when they matter to the decision — cite the
+source or mark "verification required."
 
-## 21. Reliability & Resilience
+## 25. Technology Alternatives
 
-## 22. Disaster Recovery
+Table: capability | selected | alternative(s) | reason. Only for
+significant choices.
 
-## 23. Observability
+## 26. Architecture Trade-offs
 
-## 24. Deployment Architecture
+Explicit tensions (consistency vs availability, latency vs durability,
+simplicity vs scalability, etc.) — never claim the architecture has no
+trade-offs.
 
-## 25. Technology Selection
+## 27. Failure Mode Analysis
 
-## 26. Technology Alternatives
+Table: failure mode | impact | mitigation — for the failure modes that
+are actually plausible and consequential for this system.
 
-## 27. Architecture Trade-offs
+## 28. Capacity / Scaling Analysis
 
-## 28. Failure Mode Analysis
+Only if scale materially affects the architecture. Use supplied numbers
+and explicit formulas; never fabricate. If inputs are missing: "Capacity
+Status: INCOMPLETE" plus exactly what's missing.
 
-## 29. Capacity / Scaling Analysis
+## 29. Requirements Traceability
 
-## 30. Requirements Traceability
+Table: requirement ID | architectural response. Flag any requirement
+with no architectural treatment.
 
-Table: FR-N/NFR-N -> section(s) of this document that address it. Flag any
-requirement that isn't addressed anywhere.
+## 30. Architecture Validation
 
-## 31. Architecture Validation
+Final self-check: requirement coverage, internal consistency, feasibility,
+complexity (no unjustified distributed-system machinery), failure
+handling, security, operability, evolvability, traceability.
 
-## 32. Risks
+## 31. Risks
 
-## 33. Open Questions
+Table: ID | risk | severity | mitigation.
 
-## 34. Future Evolution
+## 32. Open Questions
 
-## 35. Mermaid Diagram Specification
+Numbered list — genuinely open, not-yet-blocking questions.
 
-List each diagram mermaid-js should produce: name, type (one of
-system-context / container-architecture / request-flow / data-flow /
-sequence-diagram / deployment-architecture / entity-relationship /
-state-diagram / context-map), and what it must show. Only list diagrams
-the design actually warrants — not one of every type by default. A
-context-map diagram (section 6) is usually worth including once there's
-more than one bounded context.
+## 33. Future Evolution
+
+What would change the architecture if it happened (scale growth,
+geographic expansion, new consistency requirement) — evolutionary paths,
+not speculative work to do now.
 
 ## MVP Scope
 
 MVP number (matches the FR/NFR documents this design was derived from):
 Is this the final MVP?
 
-Design only for this MVP's FR/NFR scope — don't speculatively build
-infrastructure for deferred requirements that haven't been approved yet.
-Carry forward ADRs/components from earlier MVPs unchanged unless this
-MVP's new requirements actually affect them. Bounded contexts (section 5)
-are usually stable across MVPs — a new MVP typically adds aggregates or
-tactical detail within an existing context rather than redrawing context
-boundaries; if a genuinely new problem area appears, a new bounded context
-is fine, but don't reshuffle existing ones without a real reason.
+Design only for this MVP's FR/NFR scope. Bounded contexts / component
+boundaries (section 6/9) are usually stable across MVPs — a new MVP
+typically adds detail within an existing boundary rather than redrawing
+boundaries entirely.
 
-## Completeness Assessment
+---
 
-Architecture status:
-READY_FOR_MERMAID
+Appendix A — Source & Context Notes
 
-<or>
+Architectural assumptions and their basis; what's known vs. what's
+inferred; known uncertainty and its impact on the document's confidence
+level.
 
-Architecture status:
-BLOCKED
+---
 
-Blocking issues:
-- ...
-
-<or, if section 3 found contradictions>
-
-Architecture status:
-CONFLICT
-
-Conflicts detected:
-- CONFLICT_DETECTED: FR-N says ... while NFR-N says ...
+**Note on diagrams:** this document does not include a diagram
+specification. Diagram generation is a separate skill (`mermaid-js`),
+which derives what to draw directly from this document's structured
+content (System Context, Architecture Overview, Component Architecture,
+Request Flows, Data Model, Deployment Architecture) — you don't need to
+tell it what diagrams to produce.

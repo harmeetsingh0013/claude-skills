@@ -1,121 +1,112 @@
 # Worked example: Architecture Design — TeamLink (continued)
 
 Derived from functional-requirements v1.0 and non-functional-requirements
-v1.0 (see the FR and NFR examples). No contradictions were found between
-them, so this proceeds to a real design rather than a conflict report.
+v1.0 (see the FR and NFR examples). This example deliberately shows
+**adaptive depth**: TeamLink is a small-team product with modest scale, so
+several sections stay short or are marked Not Applicable rather than
+padded out — contrast this with a system where distributed-systems
+rigor, capacity modeling, or multi-region DR would actually be warranted.
 
-## Excerpt: Sections 4-9 (Ubiquitous Language through the ADR)
+## Excerpt of the .md document
 
 ```markdown
-## 4. Ubiquitous Language
+# System Architecture & Design Document
 
-| Term | Definition | Bounded Context |
-|------|------------|------------------|
-| Link | A shortened URL mapping a code to a destination URL | Link Management |
-| Short Code | The unique per-team identifier a Link resolves from | Link Management |
-| Click | A single instance of a visitor following a Link | Analytics |
-| Team | The billing/permissions unit that owns Links and Members | Team & Access |
-| Member | A user belonging to exactly one Team | Team & Access |
+Architecture Status: READY_WITH_ASSUMPTIONS
+Document Version: 1.0
 
-## 5. Bounded Contexts (Strategic Design)
+## 1. Executive Summary
 
-### BC-01: Link Management
-**Responsibility:** Owns creation, uniqueness, and resolution of shortened
-links.
-**Core aggregates:** Link
-**Related requirements:** FR-001, FR-002, FR-003, FR-004
+TeamLink is a small-team URL shortener. Redirect traffic will exceed
+link-creation traffic, but at a scale (a handful of teams, low hundreds of
+members) that does not justify distributed infrastructure. The proposed
+architecture is a single stateless service backed by a relational
+database, with click analytics published asynchronously so they never add
+latency to the redirect path. No caching, message broker, or
+microservices are introduced — none are justified by the stated scale.
 
-### BC-02: Analytics
-**Responsibility:** Owns recording and reporting of click activity,
-independent of the redirect path's latency budget.
-**Core aggregates:** ClickLog
-**Related requirements:** FR-005, FR-006, FR-007, NFR-001, NFR-002
+## 3. Requirements Validation
 
-### BC-03: Team & Access
-**Responsibility:** Owns team membership, roles, and authorization
-decisions consumed by the other two contexts.
-**Core aggregates:** Team
-**Related requirements:** FR-008, FR-009
+### Conflicts
+No material conflicts identified between FR-001..009 and NFR-001..002.
 
-## 6. Context Map (Strategic Design)
+### Assumptions
+- **A-1** (ASSUMPTION): Team count and redirect volume remain small enough
+  that a single database instance handles both reads and writes without
+  read scaling. Architectural impact: no read replica or cache is
+  introduced in this version. If false: read scaling (a cache or replica)
+  becomes a near-term architectural driver, not a future one.
+- **A-2** (UNKNOWN): Exact expected redirect volume was not specified in
+  NFR. Architectural impact: Section 28 (Capacity/Scaling) is marked
+  INCOMPLETE rather than estimated.
 
-| From | To | Relationship | Rationale |
-|------|-----|--------------|-----------|
-| Team & Access | Link Management | Customer-Supplier | Link Management needs valid team/member context to authorize link creation; Team & Access's model takes priority since it's the source of truth for identity. |
-| Link Management | Analytics | Published Language | Link Management publishes `LinkClicked` as a domain event; Analytics consumes it asynchronously. This is the concrete mechanism behind ADR-003 below — decoupling driven by NFR-002, not an arbitrary choice. |
+### Architecture Status
+READY_WITH_ASSUMPTIONS
 
-## 7. Architectural Drivers
+## 4. Architectural Drivers
 
-FR-005 (record every click) combined with NFR-002 (click recording must
-not add redirect latency) produces a clear driver: analytics must be
-decoupled from redirect processing. This driver is *why* Analytics is a
-separate bounded context from Link Management (section 5), not just a
-separate technology choice — see references/architecture-reasoning.md for
-the full FR+NFR -> driver -> decision -> technology chain.
+1. Redirect correctness (FR-004) — highest business importance; a wrong
+   redirect is a critical failure.
+2. Redirect latency not degraded by analytics (NFR-002) — directly shapes
+   the async-analytics decision.
+3. Team-scoped authorization (FR-006/007) — affects data model and API
+   design, moderate difficulty to change later.
 
-## 8. Tactical Design
+## 6. Architecture Overview
 
-### BC-01: Link Management
+A single stateless service (modular internally: link management, redirect
+resolution, team/access, analytics ingestion) backed by one relational
+database. No service decomposition — the scale described in FR/NFR does
+not justify the operational cost of separate deployables.
 
-**Aggregate: Link**
-- Aggregate root: Link
-- Entities: (none beyond the root)
-- Value objects: ShortCode, DestinationUrl
-- Invariants: ShortCode is unique within the owning Team; DestinationUrl
-  must be a well-formed URL.
+## 8. Architecture Decisions
 
-**Domain events published:**
-- `LinkCreated` — carries link ID, team ID, short code; no known
-  consumers yet in this MVP.
-- `LinkClicked` — carries link ID, timestamp, referrer/location signal;
-  consumed by Analytics (BC-02).
-
-### BC-02: Analytics
-
-**Aggregate: ClickLog**
-- Aggregate root: ClickLog
-- Entities: ClickEntry
-- Value objects: (none beyond entry fields)
-- Invariants: A ClickEntry always references a Link ID that existed at
-  click time (validated at consumption, not via a foreign-key join across
-  contexts).
-
-**Domain events consumed:**
-- `LinkClicked` from BC-01 — appends a ClickEntry to the relevant
-  ClickLog.
-
-## 9. Architecture Decisions
-
-### ADR-003: Publish click events asynchronously via a managed queue
-
+### ADR-003 — Publish click events asynchronously
 **Status:** Accepted
-**Driven by:** FR-005, NFR-002
-**Bounded contexts affected:** BC-01 (Link Management, publisher), BC-02
-(Analytics, consumer)
+**Context:** FR-005 requires recording every click; NFR-002 requires that
+recording not add redirect latency.
+**Decision:** The redirect handler publishes a click event to a queue and
+returns immediately; a separate consumer writes it to storage.
+**Alternatives:** Synchronous write during redirect — rejected, directly
+violates NFR-002.
+**Trade-offs:** Click counts lag redirects by the queue-processing delay;
+acceptable since no NFR requires real-time analytics.
 
-**Context:** Redirects (FR-004) must stay under 100ms p99 (NFR-001), and
-click recording (FR-005) must not add to that latency (NFR-002).
+## 14. Caching Architecture
 
-**Decision:** The redirect handler (BC-01) publishes a `LinkClicked`
-domain event to a queue and returns immediately; a separate consumer in
-BC-02 writes the event to the ClickLog.
+Not Applicable — read volume at the stated scale does not justify a
+cache; the database serves reads directly. Revisit if A-1 proves false.
 
-**Alternatives considered:**
-- Synchronous write to the database during the redirect — rejected:
-  directly violates NFR-002, and would collapse the BC-01/BC-02 boundary
-  into a single transaction, defeating the point of separating them.
-- In-memory buffer flushed periodically — rejected: risks event loss on
-  process restart, which a small-team analytics feature can tolerate less
-  than the operational simplicity gained.
-- Managed queue (SQS) vs. self-hosted Kafka — SQS chosen: this product's
-  scale (small teams, not high-throughput analytics) doesn't justify
-  Kafka's operational overhead; SQS meets the durability need with far
-  less to operate.
+## 21. Disaster Recovery
 
-**Consequences:** Click analytics (FR-006/FR-007) has slight (queue-
-processing) latency before a click appears in reports — acceptable since
-no NFR requires real-time analytics.
+RTO/RPO: UNKNOWN — not specified in NFR. Required before this can move to
+READY_FOR_IMPLEMENTATION_PLANNING: an explicit recovery target from the
+product owner.
+
+## 28. Capacity / Scaling Analysis
+
+Capacity Status: INCOMPLETE
+
+Missing:
+- expected redirects/day
+- expected concurrent teams/members
+- expected data growth rate
+
+Qualitative note: the application tier is stateless and can scale
+horizontally if needed; the database is the only stateful component and
+has no scaling design yet because no evidence currently requires one.
+
+## Completeness Assessment
+
+Architecture status:
+READY_WITH_ASSUMPTIONS
 ```
+
+(trimmed for length — sections 2, 5, 7, 9-13, 15-20, 22-27, 29-33 and
+Appendix A follow the same adaptive-depth pattern: real content where it
+matters — e.g. Section 16 Consistency & Concurrency has real substance
+because short-code uniqueness is a genuine correctness requirement —
+concise or "Not Applicable" elsewhere.)
 
 ## The matching data.json (excerpt)
 
@@ -129,86 +120,89 @@ no NFR requires real-time analytics.
     "functional_requirements": {"version": "1.0", "validation": "PASS"},
     "non_functional_requirements": {"version": "1.0", "validation": "PASS"}
   },
-  "status": "READY_FOR_MERMAID",
+  "status": "READY_WITH_ASSUMPTIONS",
   "mvp": {"number": 1, "is_final": false},
-  "conflicts": [],
-  "ubiquitous_language": [
-    {"term": "Link", "definition": "A shortened URL mapping a code to a destination URL", "bounded_context": "BC-01"},
-    {"term": "Click", "definition": "A single instance of a visitor following a Link", "bounded_context": "BC-02"}
-  ],
-  "bounded_contexts": [
+  "assumptions": [
     {
-      "id": "BC-01",
-      "name": "Link Management",
-      "responsibility": "Owns creation, uniqueness, and resolution of shortened links.",
-      "aggregates": ["Link"],
-      "related_requirements": ["FR-001", "FR-002", "FR-003", "FR-004"]
+      "id": "A-1",
+      "statement": "Team count and redirect volume remain small enough that a single database instance handles both reads and writes without read scaling.",
+      "classification": "ASSUMPTION",
+      "architectural_impact": "No read replica or cache is introduced in this version.",
+      "if_false": "Read scaling becomes a near-term architectural driver, not a future one."
     },
     {
-      "id": "BC-02",
-      "name": "Analytics",
-      "responsibility": "Owns recording and reporting of click activity, independent of the redirect path's latency budget.",
-      "aggregates": ["ClickLog"],
-      "related_requirements": ["FR-005", "FR-006", "FR-007", "NFR-001", "NFR-002"]
-    },
-    {
-      "id": "BC-03",
-      "name": "Team & Access",
-      "responsibility": "Owns team membership, roles, and authorization decisions.",
-      "aggregates": ["Team"],
-      "related_requirements": ["FR-008", "FR-009"]
+      "id": "A-2",
+      "statement": "Exact expected redirect volume was not specified in NFR.",
+      "classification": "UNKNOWN",
+      "architectural_impact": "Section 28 is marked INCOMPLETE rather than estimated.",
+      "if_false": "N/A - this is a data gap, not a reversible assumption."
     }
   ],
-  "context_map": [
-    {"from": "BC-03", "to": "BC-01", "relationship": "Customer-Supplier", "rationale": "Link Management needs valid team/member context to authorize link creation."},
-    {"from": "BC-01", "to": "BC-02", "relationship": "Published Language", "rationale": "Decoupling driven by NFR-002; LinkClicked is the integration contract."}
+  "architectural_drivers": [
+    {"rank": 1, "driver": "Redirect correctness", "reason": "FR-004; a wrong redirect is a critical failure."},
+    {"rank": 2, "driver": "Redirect latency isolated from analytics", "reason": "NFR-002 directly shapes the async-analytics decision."},
+    {"rank": 3, "driver": "Team-scoped authorization", "reason": "FR-006/007; affects data model and API design."}
   ],
-  "domain_events": [
-    {"name": "LinkCreated", "bounded_context": "BC-01", "consumed_by": []},
-    {"name": "LinkClicked", "bounded_context": "BC-01", "consumed_by": ["BC-02"]}
+  "architecture_style": {
+    "selected": "Single stateless service, modular internally (no service decomposition)",
+    "rationale": "Stated scale (a handful of teams, low hundreds of members) does not justify the operational cost of separate deployables.",
+    "alternatives_considered": [
+      {
+        "name": "Microservices (separate link/redirect/analytics services)",
+        "advantages": ["Independent scaling", "Failure isolation"],
+        "disadvantages": ["Network calls", "Distributed operational overhead not justified at this scale"],
+        "assessment": "Rejected - not justified by current requirements."
+      }
+    ]
+  },
+  "components": [
+    {"name": "Redirect Handler", "responsibility": "Resolves short codes and returns redirects; publishes click events without waiting on them.", "owned_data": "None (reads link data)"},
+    {"name": "Click Consumer", "responsibility": "Reads click events off the queue and writes them to durable storage.", "owned_data": "Click event log"}
   ],
   "adrs": [
     {
       "id": "ADR-003",
-      "title": "Publish click events asynchronously via a managed queue",
+      "title": "Publish click events asynchronously",
       "status": "Accepted",
+      "context": "FR-005 requires recording every click; NFR-002 requires that recording not add redirect latency.",
+      "decision": "The redirect handler publishes a click event to a queue and returns immediately; a separate consumer writes it to storage.",
+      "alternatives": ["Synchronous write during redirect - rejected, directly violates NFR-002."],
+      "trade_offs": "Click counts lag redirects by the queue-processing delay; acceptable since no NFR requires real-time analytics.",
       "driven_by": ["FR-005", "NFR-002"]
     }
   ],
-  "components": [
-    {"name": "Redirect Service", "responsibility": "Resolves short codes and returns redirects; publishes click events without waiting on them.", "bounded_context": "BC-01"},
-    {"name": "Click Consumer", "responsibility": "Reads click events off the queue and writes them to durable storage.", "bounded_context": "BC-02"}
-  ],
-  "diagram_specifications": [
-    {
-      "name": "context-map",
-      "type": "context-map",
-      "shows": "The three bounded contexts and their relationships from section 6."
-    },
-    {
-      "name": "request-flow",
-      "type": "sequence-diagram",
-      "shows": "Redirect path from visitor click through async click-event publication."
-    },
-    {
-      "name": "entity-relationship",
-      "type": "entity-relationship",
-      "shows": "Team/Member/Link/ClickEvent relationships."
-    }
+  "consistency_model": {
+    "strong_consistency_areas": ["Short-code uniqueness (FR-003)", "Custom alias uniqueness"],
+    "eventual_consistency_areas": ["Click analytics (FR-006/007)"]
+  },
+  "capacity_model": {
+    "status": "INCOMPLETE",
+    "missing_inputs": ["expected redirects/day", "expected concurrent teams/members", "expected data growth rate"],
+    "formulas": []
+  },
+  "trade_offs": [
+    {"tension": "Synchronous simplicity vs. asynchronous decoupling", "resolution": "Chose async for click events specifically because NFR-002 makes redirect latency non-negotiable; everything else stays synchronous for simplicity."}
   ],
   "risks": [
-    "Queue outage would silently drop click analytics (not redirects) — acceptable per NFR-002 but should be monitored."
+    {"id": "R-001", "risk": "Queue outage silently drops click analytics (not redirects).", "severity": "Low", "mitigation": "Monitor queue health; acceptable per NFR-002 since analytics is not redirect-critical."}
   ],
-  "open_questions": [],
+  "open_questions": [
+    "What is the target RTO/RPO for disaster recovery?",
+    "What is the expected redirect volume, for capacity planning?"
+  ],
   "traceability": [
-    {"requirement_id": "FR-005", "sections": ["7", "9", "10"]},
-    {"requirement_id": "NFR-002", "sections": ["7", "9"]}
+    {"requirement_id": "FR-005", "architectural_response": "Click Consumer + ADR-003"},
+    {"requirement_id": "NFR-002", "architectural_response": "ADR-003 (async publication)"}
+  ],
+  "not_applicable_sections": [
+    {"section": "14. Caching Architecture", "reason": "Read volume at stated scale does not justify a cache."},
+    {"section": "15. Messaging / Event Architecture", "reason": "Only the single click-event queue exists; covered under ADR-003, no broader event architecture needed."}
   ]
 }
 ```
 
-Notice the bounded contexts (BC-01/02/03) are the load-bearing structure
-here: they show up in the strategic design sections, the tactical design,
-the component architecture, and the ADR. That's deliberate — a bounded
-context identified in section 5 should be traceable all the way through
-the document, not introduced once and forgotten.
+Notice what's absent: no diagram specification anywhere in this document
+— that's mermaid-js's job now, working directly from this content (it
+would derive a component diagram from `components`, and a request-flow
+diagram from the redirect sequence described in Section 10, without
+being told to).

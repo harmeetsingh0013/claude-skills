@@ -1,9 +1,11 @@
 # ADR format
 
-One entry per consequential decision. Number sequentially (ADR-1, ADR-2, ...).
+Concise, per-decision. Number sequentially (ADR-001, ADR-002, ...). Only
+write one for a genuinely significant, expensive-to-reverse decision —
+not for every implementation detail.
 
 ```markdown
-### ADR-3: Use Postgres for link and click-event storage
+### ADR-003 — Use Postgres for link and click-event storage
 
 **Status:** Accepted
 **Driven by:** NFR-4 (write consistency), NFR-9 (durability)
@@ -14,7 +16,7 @@ recorded (NFR-9: 99.999999999% durability).
 
 **Decision:** Use Postgres as the primary store for links and click events.
 
-**Alternatives considered:**
+**Alternatives:**
 - DynamoDB — rejected: the duplicate-short-code check (FR-3) needs a
   unique constraint enforced at write time across the team's existing
   codes, which is awkward without a relational unique index.
@@ -22,13 +24,20 @@ recorded (NFR-9: 99.999999999% durability).
   team has more relational-consistency requirements than document-shape
   flexibility needs.
 
-**Consequences:** Introduces a relational schema migration process; click
-event volume will need partitioning strategy revisited if throughput grows
-past NFR-2's current target.
+**Trade-offs:** Gains strong uniqueness/transactional guarantees at the
+cost of a relational schema-migration process; click event volume will
+need a partitioning strategy revisited if throughput grows past NFR-2's
+current target.
 ```
 
-Keep each ADR self-contained — a reader should understand the decision
-without cross-referencing three other sections. When revising an existing
-architecture document, add a new ADR that supersedes an old one rather than
-editing the old one in place (mark the old one's status as `Superseded by
-ADR-N`), so the document keeps a decision history.
+Four parts, always: **Context** (what forces this decision), **Decision**
+(what was chosen, stated plainly), **Alternatives** (what else was
+considered and why it lost), **Trade-offs** (what's given up, not just
+what's gained — never present a decision as having none). Keep each ADR
+self-contained — a reader should understand it without cross-referencing
+three other sections.
+
+When revising an existing architecture document, add a new ADR that
+supersedes an old one rather than editing the old one in place (mark the
+old one's status `Superseded by ADR-N`), so the document keeps a decision
+history.

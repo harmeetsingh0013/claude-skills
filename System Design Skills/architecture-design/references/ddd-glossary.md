@@ -1,8 +1,17 @@
-# Domain-Driven Design: glossary and heuristics
+# Domain-Driven Design: an optional technique for domain boundaries
 
-Quick reference for the terms and patterns architecture-design uses.
-This is a lookup, not a tutorial — it's here so terminology stays
-consistent across a document, not to teach DDD from scratch.
+This is **not a mandatory structure** — the canonical document structure
+(see `templates/architecture-design.md`) has no dedicated DDD sections.
+Reach for these concepts only when a system's domain complexity actually
+warrants them (multiple distinct business capabilities with different
+vocabularies, ownership, or consistency needs) — fold the result into
+Section 6 (Architecture Overview) and Section 9 (Component/Service
+Architecture) as prose and component definitions, not as separate
+"Bounded Contexts" or "Context Map" sections. For a simple system, a
+plain list of components with clear responsibilities is enough; don't
+introduce DDD vocabulary just because it's available.
+
+This is a lookup for the terms, if you do reach for them — not a tutorial.
 
 ## Strategic design (the big picture)
 
