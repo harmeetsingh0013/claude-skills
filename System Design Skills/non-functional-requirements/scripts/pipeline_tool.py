@@ -170,8 +170,13 @@ PIPELINE = {
     },
     "mermaid-diagrams": {
         "inputs": ["architecture-design"],
-        "next": None,
+        "next": "project-readme",
         "skill": "mermaid-js",
+    },
+    "project-readme": {
+        "inputs": ["mermaid-diagrams"],
+        "next": None,
+        "skill": "project-readme",
     },
 }
 
@@ -781,7 +786,7 @@ def cmd_needs_rerun(args):
 def cmd_plan(args):
     """Walk the DAG in order and report which doc_types need a rerun, cascading."""
     order = ["mini-prd", "functional-requirements", "non-functional-requirements",
-             "architecture-design", "mermaid-diagrams"]
+             "architecture-design", "mermaid-diagrams", "project-readme"]
     plan = []
     for doc_type in order:
         spec = PIPELINE[doc_type]
@@ -1046,6 +1051,32 @@ def cmd_task_status_list(args):
     print(json.dumps(read_task_statuses(args.doc_type), indent=2))
 
 
+def cmd_list_doc_types(args):
+    """
+    Enumerate every document type that actually exists for this project
+    (has a LATEST.json), with its current version/status — including any
+    sprints, which don't have a fixed doc-type name. Useful for anything
+    that needs to build a complete picture of what's been produced without
+    hardcoding the pipeline's doc-type list (e.g. project-readme).
+    """
+    result = []
+    if ROOT.exists():
+        for sub in sorted(ROOT.iterdir()):
+            if not sub.is_dir() or sub.name.startswith("."):
+                continue
+            latest_path = sub / "LATEST.json"
+            if latest_path.exists():
+                latest = json.loads(latest_path.read_text())
+                result.append({"doc_type": sub.name, **latest})
+            elif sub.name == "sprints":
+                for sprint_dir in sorted(sub.iterdir()):
+                    sprint_latest = sprint_dir / "LATEST.json"
+                    if sprint_dir.is_dir() and sprint_latest.exists():
+                        latest = json.loads(sprint_latest.read_text())
+                        result.append({"doc_type": f"sprints/{sprint_dir.name}", **latest})
+    print(json.dumps(result, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project",
@@ -1163,6 +1194,11 @@ def main():
     p = sub.add_parser("task-status-list", help="List all task statuses for a sprint")
     p.add_argument("doc_type", help="e.g. sprints/sprint-01")
     p.set_defaults(func=cmd_task_status_list)
+
+    sub.add_parser("list-doc-types",
+                    help="List every document type that exists for this "
+                         "project, with current version/status").set_defaults(
+        func=cmd_list_doc_types)
 
     args = parser.parse_args()
 

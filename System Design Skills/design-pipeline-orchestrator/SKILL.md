@@ -1,6 +1,6 @@
 ---
 name: design-pipeline-orchestrator
-description: Coordinates the five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js), deciding which stages need to run or re-run, and enforcing that a stage never runs on stale or non-READY input. The pipeline works in MVP-sized iterations — each requirements stage produces a small batch (~10 items) per round, not the whole product at once — and this skill tracks when an MVP is complete and offers to start the next. Use this to run the pipeline end-to-end, check status, start a new product, begin the next MVP, or propagate a changed input downstream. Prefer this over invoking an individual stage directly whenever more than one stage might be affected or it's unclear which should run; use a specific stage skill (mini-prd / functional-requirements / non-functional-requirements / architecture-design / mermaid-js) only when the user names exactly one with no staleness ambiguity.
+description: Coordinates the six-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js → project-readme), deciding which stages need to run or re-run, and enforcing that a stage never runs on stale or non-READY input. The pipeline works in MVP-sized iterations — each requirements stage produces a small batch (~10 items) per round, not the whole product at once — and this skill tracks when an MVP is complete and offers to start the next. Use this to run the pipeline end-to-end, check status, start a new product, begin the next MVP, or propagate a changed input downstream. Prefer this over invoking an individual stage directly whenever more than one stage might be affected or it's unclear which should run; use a specific stage skill (mini-prd / functional-requirements / non-functional-requirements / architecture-design / mermaid-js / project-readme) only when the user names exactly one with no staleness ambiguity.
 ---
 
 # Design Pipeline Orchestrator
@@ -9,12 +9,13 @@ You decide *which* pipeline skills need to run and in *what order* — you do
 not write the PRD, requirements, architecture, or diagrams yourself. Each
 stage's actual content is produced by following that stage's own skill
 (`mini-prd`, `functional-requirements`, `non-functional-requirements`,
-`architecture-design`, `mermaid-js`), which you should treat as available
-sub-skills to consult, the same way you'd consult any other skill. Read
-`references/pipeline-conventions.md` once at the start of a session if you
-haven't already — it defines the project-ID scheme, the shared directory
-layout, the two-file document contract (`.md` + `.data.json`), and the
-envelope schema that make this coordination possible.
+`architecture-design`, `mermaid-js`, `project-readme`), which you should
+treat as available sub-skills to consult, the same way you'd consult any
+other skill. Read `references/pipeline-conventions.md` once at the start
+of a session if you haven't already — it defines the project-ID scheme,
+the shared directory layout, the two-file document contract (`.md` +
+`.data.json`), and the envelope schema that make this coordination
+possible.
 
 ## Step 1: Get the project ID — always, before anything else
 
@@ -121,7 +122,7 @@ project's subtree.
 python scripts/pipeline_tool.py --project <id> plan
 ```
 
-This walks all five stages in order and reports, per stage, one of:
+This walks all six stages in order and reports, per stage, one of:
 
 - `RUN` — this stage's recorded inputs no longer match its required
   inputs' current versions (or it has never been run, or its current
@@ -153,7 +154,7 @@ correctly show the downstream stages as `RUN` from that point on.
 
 For each stage marked `RUN`, in the order the plan lists them (mini-prd,
 then functional-requirements, then non-functional-requirements, then
-architecture-design, then mermaid-js):
+architecture-design, then mermaid-js, then project-readme):
 
 1. Invoke that stage by following its own SKILL.md instructions, passing
    along the same project ID.
@@ -206,35 +207,48 @@ stages ran and to what version, which were skipped as up to date, and — if
 execution stopped early — exactly what's blocking and what input would
 unblock it.
 
-If `mermaid-diagrams` finished this run with `status: "READY"` (i.e. a
-full MVP cycle just completed end to end), check whether there's more
-work implied: read `is_final` from the latest `functional-requirements`
-`data.json` (every stage from functional-requirements onward should agree
-on this by the time mermaid finishes, since it's carried through — see
-each stage's own SKILL.md; mini-prd itself doesn't carry an `mvp` object —
-see "Working in MVP-sized batches" in `references/pipeline-conventions.md`).
+If `project-readme` finished this run with `status: "READY"` (i.e. a full
+MVP cycle just completed end to end, including the project's README being
+regenerated), check whether there's more work implied: read `is_final`
+from the latest `functional-requirements` `data.json` (every requirements/
+design stage should agree on this by the time project-readme finishes,
+since it's carried through — see each stage's own SKILL.md; mini-prd and
+project-readme themselves don't carry an `mvp` object the same way — see
+"Working in MVP-sized batches" in `references/pipeline-conventions.md`).
 
 - **`is_final: false`** — there's more scope deferred to future MVPs.
   Check the backlog for a fuller picture than the FR document's `deferred`
   snapshot: `python scripts/pipeline_tool.py --project <id> backlog-list functional-requirements`.
-  Tell the user what MVP just shipped and what's pending on the backlog,
-  then ask something like: *"MVP \<N\> is complete end-to-end. On the
-  backlog for next time: \<items\>. Want me to start MVP \<N+1\>, and
-  should I just prioritize from the backlog myself or is there something
-  specific you want pulled in first?"* If they say yes, go back to Step 3
-  with "the user wants the next MVP" as the recorded input, and run the
-  pipeline again from `functional-requirements`. You can also mention
-  that `sprint-planning` can generate implementation tasks for what's
-  already built, even before later MVPs are scoped — it only needs FR,
-  NFR, and architecture-design to be READY, not `is_final: true`.
+  Tell the user what MVP just shipped (mentioning that `README.md` at the
+  project root now reflects it) and what's pending on the backlog, then
+  ask something like: *"MVP \<N\> is complete end-to-end, and the project
+  README is up to date. On the backlog for next time: \<items\>. Want me
+  to start MVP \<N+1\>, and should I just prioritize from the backlog
+  myself or is there something specific you want pulled in first?"* If
+  they say yes, go back to Step 3 with "the user wants the next MVP" as
+  the recorded input, and run the pipeline again from
+  `functional-requirements`. You can also mention that `sprint-planning`
+  can generate implementation tasks for what's already built, even before
+  later MVPs are scoped — it only needs FR, NFR, and architecture-design
+  to be READY, not `is_final: true`.
 - **`is_final: true`** — nothing's deferred; the product's full scope (as
   currently understood) is built out. Say so plainly rather than asking
   about a next MVP that doesn't exist yet — and mention that the design
   is now complete enough to generate implementation tasks, if they want:
-  *"The design is fully built out. Want me to generate an implementation
-  sprint from it?"* That's the `sprint-planning` skill — invoke it only if
-  they say yes; it's a separate, on-request capability, not something
-  this orchestrator chains into automatically.
+  *"The design is fully built out, and the project README is up to date.
+  Want me to generate an implementation sprint from it?"* That's the
+  `sprint-planning` skill — invoke it only if they say yes; unlike
+  `project-readme` (which runs automatically as part of this cascade),
+  `sprint-planning` is a separate, on-request capability this orchestrator
+  never chains into automatically.
+
+If `sprint-planning` has been run at some point (check
+`python scripts/pipeline_tool.py --project <id> list-doc-types` for any
+`sprints/sprint-NN` entries) and this run touched anything upstream of
+`project-readme`, mention that re-running `project-readme` will pick up
+the new sprint in its document index automatically — you don't need to
+do anything special to make that happen beyond letting `project-readme`
+run as usual.
 
 Don't ask about the next MVP after a partial run (a stage stopped on
 `BLOCKED_QUESTION`/`CONFLICT`/`ERROR`, or the user only asked for one

@@ -1,17 +1,20 @@
 # Design pipeline conventions
 
-These conventions are shared by all seven pipeline skills: `mini-prd`,
+These conventions are shared by all eight pipeline skills: `mini-prd`,
 `functional-requirements`, `non-functional-requirements`,
-`architecture-design`, `mermaid-js`, `sprint-planning`, and
-`design-pipeline-orchestrator`. Every skill uses the same
+`architecture-design`, `mermaid-js`, `project-readme`, `sprint-planning`,
+and `design-pipeline-orchestrator`. Every skill uses the same
 `pipeline_tool.py` (a copy lives in each skill's `scripts/` folder) and
-the same six JSON Schemas (copies live in each content skill's `schema/`
+the same seven JSON Schemas (copies live in each content skill's `schema/`
 folder), so behavior is identical no matter which skill is invoked.
 
 The core pipeline is: **mini-prd → functional-requirements →
-non-functional-requirements → architecture-design → mermaid-js**.
-mini-prd is the only stage with no upstream document to gate on — it
-starts from a raw problem/idea description instead.
+non-functional-requirements → architecture-design → mermaid-js →
+project-readme**. mini-prd is the only stage with no upstream document to
+gate on — it starts from a raw problem/idea description instead.
+project-readme is the pipeline's true final stage, run automatically
+after mermaid-js as part of the normal cascade (unlike sprint-planning,
+below).
 
 `sprint-planning` sits outside that cascade: once functional-requirements,
 non-functional-requirements, and architecture-design are all `READY`, it
@@ -204,6 +207,10 @@ Inside a project's folder, the layout is:
     v1.0.data.json
     v1.0.envelope.json
     LATEST.json            # doc_path points at the v1.0/ directory
+  project-readme/          (same shape as mini-prd — versioned .md + .data.json)
+  README.md                # unversioned convenience copy of project-readme's
+                            # latest .md, kept at the project root for visibility
+  sprints/                 # only if sprint-planning has been run — see below
 ```
 
 Separately, a small registry at `<current-working-directory>/.design-pipeline/projects.json`
@@ -278,7 +285,7 @@ Field notes:
 
 | Document's own "Completeness Assessment" | Envelope `status` |
 |---|---|
-| `READY_FOR_NFR` / `READY` (mermaid-diagrams) | `READY` |
+| `READY_FOR_NFR` / `READY` (mermaid-diagrams, project-readme) | `READY` |
 | `READY_FOR_IMPLEMENTATION_PLANNING` / `READY_WITH_ASSUMPTIONS` (architecture-design only) | `READY` |
 | `BLOCKED` (mini-prd, functional-requirements, non-functional-requirements — with blocking issues listed) | `BLOCKED_QUESTION` |
 | `BLOCKED` (architecture-design only — per its own definition, this specifically means an unresolved material contradiction, not just missing information; see architecture-design's own SKILL.md) | `CONFLICT` |
@@ -429,6 +436,22 @@ contradiction with `code: "CONFLICT_DETECTED"`, and a `summary` describing
 the mismatch in plain language. Still write and finalize a document — a
 short conflict report is a legitimate, useful pipeline output; a design
 built on an unresolved contradiction is not.
+
+## Discovering what exists, without hardcoding a doc-type list
+
+`list-doc-types` returns every document type a project actually has
+(anything with a `LATEST.json`, including `sprints/sprint-NN` entries),
+each with its current version and status:
+
+```
+python scripts/pipeline_tool.py --project <id> list-doc-types
+```
+
+This is what `project-readme` uses to build its document index — and it's
+generally the right tool any time a skill needs to know what's present
+rather than assuming a fixed list, since not every project has run
+`sprint-planning`, and the set of documents only grows over the life of a
+project.
 
 ## Sprints and task tracking (sprint-planning only)
 

@@ -1,6 +1,6 @@
 ---
 name: mermaid-js
-description: Generates Mermaid.js diagram files by reading a Final Architecture Design Document's structured content directly — System Context, Architecture Overview, Component Architecture, Request Flows, Data Model, and Deployment Architecture — and deciding which diagrams that content actually warrants, as stage 4 (final stage) of a five-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js). Use this when the user wants diagrams (component, sequence, ER, deployment, event flow, etc.) generated from an already-completed architecture design, or explicitly asks to run/update the "mermaid" / "diagrams" stage. Also use it when re-invoked by the design-pipeline-orchestrator skill. This skill only visualizes an existing, already-decided design — it never makes or reconsiders architecture decisions; if the architecture document's content is too ambiguous to render faithfully, that's a gap to flag, not a decision to make here.
+description: Generates Mermaid.js diagram files by reading a Final Architecture Design Document's structured content directly — System Context, Architecture Overview, Component Architecture, Request Flows, Data Model, and Deployment Architecture — and deciding which diagrams that content actually warrants, as stage 4 of a six-stage design pipeline (mini-prd → functional-requirements → non-functional-requirements → architecture-design → mermaid-js → project-readme). Use this when the user wants diagrams (component, sequence, ER, deployment, event flow, etc.) generated from an already-completed architecture design, or explicitly asks to run/update the "mermaid" / "diagrams" stage. Also use it when re-invoked by the design-pipeline-orchestrator skill. This skill only visualizes an existing, already-decided design — it never makes or reconsiders architecture decisions; if the architecture document's content is too ambiguous to render faithfully, that's a gap to flag, not a decision to make here.
 ---
 
 # Mermaid.js Diagram Generation
@@ -143,9 +143,10 @@ in the directory (name, type, what it shows, source, validated). See
 matching `data.json`.
 
 Alongside the directory, produce a `.data.json` following
-`schema/mermaid-diagrams.schema.json` — this is the pipeline's final
-artifact, so there's no further downstream skill to hand it to, but it's
-still the record of what was produced and how it was validated.
+`schema/mermaid-diagrams.schema.json` — `project-readme` reads this
+directly afterward to know what diagrams to embed, so its `index.md`-like
+completeness matters even though this isn't a hard-gated dependency for
+you the way FR/NFR are for architecture-design.
 
 ## No hallucination
 
@@ -168,9 +169,7 @@ extraction, not redesign, so a requested change that would alter the
 architecture itself (not just how it's drawn) should be redirected back to
 `architecture-design` rather than made here. Repeat until the user
 explicitly confirms, or explicitly tells you to proceed without further
-review. This applies even when the orchestrator invoked you. Since this is
-the pipeline's last stage, confirming here is the final sign-off on the
-whole design, not just a handoff to another stage.
+review. This applies even when the orchestrator invoked you.
 
 ## Finishing
 
@@ -188,8 +187,9 @@ further review):
    with `"document_path"` set to the **directory** (not a file inside it),
    `status` set to `READY` or `BLOCKED_QUESTION` per
    `references/pipeline-conventions.md`'s mapping table, and
-   `"next_skill": null` — this is the last stage.
+   `"next_skill": "project-readme"`.
 6. Run `python scripts/pipeline_tool.py --project <id> finalize <project-root>/mermaid-diagrams/v<version>.envelope.json`
    (it hashes the whole directory automatically).
 7. Report to the user the version produced, which diagrams were generated,
-   and which method (MCP vs native) and validation level each used.
+   which method (MCP vs native) and validation level each used, and that
+   `project-readme` can now run.
